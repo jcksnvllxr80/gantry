@@ -1,12 +1,16 @@
 # Gantry
 
-Single-file browser Gantt chart creator for delivery planning.
+A single-file, browser-based Gantt chart tool for delivery planning.
+
+Gantry lets you build and edit project timelines locally in the browser, manage
+dependencies, account for holidays and workdays, and export the result as JSON,
+PNG, or PDF.
 
 ## Files
 
 - `gantt.html` - app UI and all logic
 
-## Create The Chart
+## Getting Started
 
 1. Open `gantt.html` in a browser.
 2. Click `Add Task`.
@@ -14,7 +18,7 @@ Single-file browser Gantt chart creator for delivery planning.
 4. Use `Link` to connect dependencies.
 5. Use `Save JSON` to export the current state.
 
-## Update an existing Chart
+## Edit An Existing Chart
 
 1. Open `gantt.html` in a browser.
 2. Browse for your previously saved config file (json) to define the default tasks.
@@ -26,12 +30,12 @@ Single-file browser Gantt chart creator for delivery planning.
 
 ```json
 {
-  "id": "service1",
-  "name": "Service 1",
+  "id": "task1",
+  "name": "Task 1",
   "start": "2026-04-06",
   "daysOfEffort": 15,
   "progress": 0,
-  "dependencies": "service 0",
+  "dependencies": "task0",
   "assignee": "John Doe",
   "phase": 1,
   "done": false,
@@ -53,23 +57,24 @@ Older data with `start` and `end` still loads, but the app saves tasks back as `
 
 ## Features
 
-- Day, Week, and Month timeline views
+- Single-file app with no build step
+- Day, week, and month timeline views
 - Row height and timeline width zoom controls
-- Drag to reschedule tasks
-- Downstream dependency cascade on date moves
-- Resize task effort without cascading dates
+- Drag-to-reschedule editing
+- Downstream dependency cascading on date moves
+- Effort resizing without automatic date cascading
 - Link mode for creating dependency arrows
-- Dependency add/remove in the sidebar
-- Multi-select and batch edit
-- Copy/paste selected tasks
+- Dependency editing in the sidebar
+- Multi-select, batch edit, and copy/paste
 - Done and TBD task states
 - Weekend exclusion for workday-based scheduling
-- Holiday file loading and holiday shading
+- Holiday loading and holiday shading
 - Light and dark theme toggle
-- Save JSON and load JSON
+- JSON import and export
 - PNG and PDF export
-- Reset back to your config
+- Reset back to the loaded config
 
 ## Notes
 
 - Theme is saved in browser `localStorage`
+- Third-party library notices are listed in `THIRD_PARTY_NOTICES.md`
