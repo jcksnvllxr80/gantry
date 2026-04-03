@@ -22,20 +22,21 @@ PNG, or PDF.
 ## Edit An Existing Chart
 
 1. Open `gantt.html` in a browser.
-2. Browse for your previously saved chart config JSON, or load a phase-only JSON first and then add tasks.
-3. Browse for (or create) your holidays file (json) to define holidays for shading and workday scheduling.
-4. Decide whether to disable weekends for workday-based scheduling.
-5. When done editing, save to PNG or PDF, and export the updated JSON.
+2. Load a previously saved chart config JSON to restore tasks, phases, markers, holidays, and view settings.
+3. Optionally load a phase-only JSON first if you want to start a new chart from a saved phase set.
+4. Browse for (or create) a holidays JSON file if you want to replace the holidays stored in the project config.
+5. Decide whether to disable weekends for workday-based scheduling.
+6. When done editing, save to PNG or PDF, and export the updated JSON.
 
 ## Phase Sets
 
 Phases are user-defined. You can:
 
-- use the right sidebar tabs: `Task` for task editing, `Phases` for phase management
-- create, rename, recolor, and delete phases in the `Phases` tab
+- use the right sidebar tabs: `Task` for task editing, `Global` for phases, legend, markers, and holidays
+- create, rename, recolor, and delete phases in the `Global` tab
 - save the current phase set as a phase-only JSON file
 - load a phase-only JSON file before adding tasks
-- save full chart JSON files that include both `phases` and `tasks`
+- save full chart JSON files that include `tasks`, `phases`, `markers`, `holidays`, and `settings`
 
 Clicking a task bar in the chart switches the sidebar back to the `Task` tab automatically.
 
@@ -64,6 +65,18 @@ Example phase set:
   "phases": [
     { "id": "discovery", "name": "Discovery", "color": "#B35C00" },
     { "id": "production", "name": "Production", "color": "#0969DA" }
+  ]
+}
+```
+
+Example project-level holidays in saved JSON:
+
+```json
+{
+  "holidayName": "Funny Demo Holidays 2026",
+  "holidays": [
+    { "date": "2026-04-10", "name": "International Overcaffeinated Pigeon Awareness Day" },
+    { "date": "2026-04-14", "name": "Mandatory Tiny Hat Friday" }
   ]
 }
 ```
@@ -99,6 +112,7 @@ Rules:
 - `progress`: 0–100, percentage complete
 - `done: true` shows complete styling (also sets progress to 100)
 - `tbd: true` shows estimate-TBD styling
+- `holidays`: project JSON can embed holiday dates and names directly
 
 Older data with `start` and `end` still loads, but the app saves tasks back as `daysOfEffort`.
 
@@ -119,7 +133,7 @@ Older data with `start` and `end` still loads, but the app saves tasks back as `
 - Task progress tracking via sidebar slider (0–100%, step 5) or bar drag handle
 - Done and TBD task states
 - Weekend exclusion for workday-based scheduling
-- Holiday loading and holiday shading
+- Holiday loading, holiday list in the `Global` tab, chart shading, and embedded holiday save/load
 - Timeline markers (labeled vertical lines for "Today", goals, milestones)
 - Light and dark theme toggle
 - JSON import and export
@@ -147,6 +161,13 @@ Marker format in saved JSON:
   ]
 }
 ```
+
+## Holidays
+
+- Manage holidays in the **Global** sidebar tab under **Holidays**
+- Clicking a holiday in the list temporarily highlights its chart column
+- Hovering a holiday-shaded chart column shows the holiday name and date
+- Holidays loaded from a holiday file are saved back into the main project JSON
 
 ## Notes
 

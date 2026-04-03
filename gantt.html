@@ -238,12 +238,12 @@
     .holiday-list { display: flex; flex-direction: column; gap: 6px; }
     .holiday-item {
       background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
-      padding: 8px 10px; cursor: pointer; transition: border-color .12s, background .12s;
+      padding: 5px 8px; min-height: 30px; cursor: pointer; transition: border-color .12s, background .12s;
+      display: flex; align-items: center; gap: 8px;
     }
     .holiday-item:hover { border-color: var(--accent); background: rgba(88,166,255,.08); }
-    .holiday-item-date { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
-    .holiday-item-name { font-size: 12px; color: var(--text); line-height: 1.4; }
-    .holiday-item-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .holiday-item-date { font-size: 11px; color: var(--muted); flex: none; }
+    .holiday-item-name { font-size: 12px; color: var(--text); line-height: 1.3; flex: 1; min-width: 0; text-align: left; }
     .panel-sep { border: none; border-top: 1px solid var(--border); margin: 16px 0 8px; }
     .weekend-shade rect.holiday-focus,
     .weekend-shade rect.weekend-holiday-cell.holiday-focus {
@@ -1016,9 +1016,8 @@ function renderHolidayManager() {
   }
   host.innerHTML = '<div class="holiday-list">' + holidayEntries.map(function(entry){
     return '<button class="holiday-item" type="button" data-holiday-date="'+escHtml(entry.date)+'">'+
-      '<div class="holiday-item-date">'+escHtml(fmtDate(entry.date))+'</div>'+
-      '<div class="holiday-item-name">'+escHtml(entry.name || 'Holiday')+'</div>'+
-      '<div class="holiday-item-meta">'+escHtml(entry.date)+'</div>'+
+      '<span class="holiday-item-date">'+escHtml(entry.date)+'</span>'+
+      '<span class="holiday-item-name">'+escHtml(entry.name || 'Holiday')+'</span>'+
     '</button>';
   }).join('') + '</div>';
   host.querySelectorAll('[data-holiday-date]').forEach(function(btn){
@@ -1079,11 +1078,13 @@ function deletePhase(phaseId) {
   renderGantt();
 }
 function parseConfigPayload(data) {
-  if(Array.isArray(data)) return { tasks: data, phases: [], markers: [], settings: null, title: '' };
+  if(Array.isArray(data)) return { tasks: data, phases: [], markers: [], holidays: [], holidayName: '', settings: null, title: '' };
   return {
     tasks: Array.isArray(data.tasks) ? data.tasks : [],
     phases: Array.isArray(data.phases) ? data.phases : [],
     markers: Array.isArray(data.markers) ? data.markers : [],
+    holidays: Array.isArray(data.holidays) ? data.holidays : [],
+    holidayName: data.holidayName || '',
     settings: data.settings || null,
     title: data.title || ''
   };
@@ -1101,6 +1102,18 @@ function applyLoadedConfig(data, options) {
   if(parsed.markers.length) {
     markers = parsed.markers.map(function(m){ return deepClone(m); });
   }
+  holidayEntries = (parsed.holidays || []).map(function(h, index){
+    var rawDate = (h && typeof h === 'object') ? h.date : h;
+    var date = String(rawDate || '').slice(0,10);
+    return {
+      id: 'holiday-loaded-' + index + '-' + date,
+      date: date,
+      name: (h && typeof h === 'object' && h.name) ? String(h.name) : 'Holiday'
+    };
+  }).filter(function(entry){ return !!entry.date; }).sort(function(a, b){ return a.date.localeCompare(b.date); });
+  holidaySet = new Set(holidayEntries.map(function(entry){ return entry.date; }));
+  loadedHolidayName = parsed.holidayName || (holidayEntries.length ? 'Project Holidays' : '');
+  highlightedHolidayDate = '';
   DEFAULT_MARKERS = deepClone(markers);
   if((options || {}).updateTitle && parsed.title) {
     document.getElementById('appTitle').textContent = parsed.title;
@@ -1117,6 +1130,7 @@ function applyLoadedConfig(data, options) {
   document.getElementById('taskDetail').innerHTML = '';
   document.getElementById('hint').style.display = '';
   syncPhaseUI(false);
+  applyExcludeHolidays(holidayEntries.length ? excludeHolidays : false);
   if(parsed.settings) {
     var s = parsed.settings;
     if(s.viewMode && /^(Day|Week|Month)$/.test(s.viewMode)) {
@@ -2264,7 +2278,11 @@ function doSaveJson(){
     },
     phases:phases.map(serialisePhase),
     tasks:tasks.map(serialiseTask),
-    markers:markers.map(serialiseMarker)
+    markers:markers.map(serialiseMarker),
+    holidayName: loadedHolidayName || '',
+    holidays: holidayEntries.map(function(entry){
+      return { date: entry.date, name: entry.name };
+    })
   });
 }
 function doLoadJson(){ document.getElementById('fileInput').value=''; document.getElementById('fileInput').click(); }
