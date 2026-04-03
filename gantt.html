@@ -192,6 +192,17 @@
     :root.light .weekend-shade rect.weekend-cell { fill: rgba(200,20,20,0.10) !important; }
     :root.light .weekend-shade rect.holiday-cell { fill: rgba(110,110,110,0.18) !important; }
     :root.light .weekend-shade rect.weekend-holiday-cell { fill: rgba(145,95,95,0.18) !important; }
+    /* ── Vertical markers ──────────────────────────────────────── */
+    .marker-lines line.marker-line  { stroke-width: 2; stroke-dasharray: 6 3; opacity: 0.85; }
+    .marker-lines text.marker-label { font-size: 11px; font-weight: 600; pointer-events: none; }
+    :root.light .marker-lines line.marker-line { opacity: 0.7; }
+    .marker-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+    .marker-row .field-input { flex: 1; min-width: 0; }
+    .marker-row input[type="date"] { width: 130px; flex: none; }
+    .marker-swatch { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; flex: none; }
+    .marker-color-input { position: absolute; width: 0; height: 0; opacity: 0; overflow: hidden; pointer-events: none; }
+    .marker-delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 16px; padding: 2px 4px; flex: none; }
+    .marker-actions { margin-top: 8px; }
     .phase-labels { margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 5px; }
     .phase-pill {
       display: inline-block; font-size: 11px; font-weight: 700;
@@ -206,6 +217,7 @@
     .bar-wrapper.bar-done .bar-label.big { fill: #333 !important; }
     .bar-wrapper.bar-tbd  .bar { fill: #bf8700 !important; }
     .bar-wrapper .bar-progress  { fill: rgba(255,255,255,.28) !important; }
+    .bar-wrapper:hover .handle.progress { fill: rgba(255,255,255,.85) !important; cursor: ew-resize; }
     #gantt svg, #reorderOverlay { user-select: none; }
     .today-highlight { fill: rgba(9,105,218,.06) !important; }
     .bar-wrapper.link-source .bar { fill: #db6d28 !important; stroke: #ff9a4d !important; stroke-width: 2px !important; }
@@ -482,6 +494,9 @@
 
         <div class="sec-title">Legend</div>
         <div class="legend" id="legend"></div>
+
+        <div class="sec-title">Timeline Markers</div>
+        <div id="markerManager"></div>
       </div>
     </div>
   </aside>
@@ -670,6 +685,9 @@ function serialiseTask(t) {
 function serialisePhase(phase) {
   return { id: phase.id, name: phase.name, color: phase.color };
 }
+function serialiseMarker(m) {
+  return { id: m.id, label: m.label, date: m.date, color: m.color, isToday: !!m.isToday };
+}
 function normalisePhase(def, index) {
   var raw = def || {};
   var name = String(raw.name || raw.id || ('Phase ' + (index + 1))).trim() || ('Phase ' + (index + 1));
@@ -818,6 +836,79 @@ function renderPhaseManager() {
     if(selectedId && activeSidebarTab === 'task') showDetail(selectedId);
   });
 }
+function renderMarkerManager() {
+  var host = document.getElementById('markerManager');
+  if(!host) return;
+  var rows = markers.map(function(m){
+    var dateDisabled = m.isToday ? ' disabled title="Auto-set to today"' : '';
+    var dateVal = m.isToday ? toISO(new Date()) : (m.date || '');
+    return '<div class="marker-row" data-marker-id="'+escHtml(m.id)+'">'+
+      '<div class="marker-swatch" style="background:'+m.color+'" data-marker-swatch="'+escHtml(m.id)+'"></div>'+
+      '<input class="marker-color-input" type="color" value="'+m.color+'" data-marker-color="'+escHtml(m.id)+'" />'+
+      '<input class="field-input" type="text" value="'+escHtml(m.label)+'" data-marker-label="'+escHtml(m.id)+'" placeholder="Label" />'+
+      '<input class="field-input" type="date" value="'+dateVal+'"'+dateDisabled+' data-marker-date="'+escHtml(m.id)+'" />'+
+      '<button class="marker-delete-btn" data-marker-delete="'+escHtml(m.id)+'" title="Remove marker">&times;</button>'+
+    '</div>';
+  }).join('');
+  host.innerHTML = (markers.length ? rows : '<div class="phase-empty">No markers yet.</div>') +
+    '<div class="marker-actions"><button class="btn btn-green" id="btnAddMarker">+ Add Marker</button></div>';
+
+  host.querySelectorAll('[data-marker-swatch]').forEach(function(sw){
+    sw.addEventListener('click', function(){
+      var colorInput = host.querySelector('[data-marker-color="'+sw.dataset.markerSwatch+'"]');
+      if(colorInput) colorInput.click();
+    });
+  });
+  host.querySelectorAll('[data-marker-color]').forEach(function(input){
+    input.addEventListener('input', function(){
+      var m = markerById(input.dataset.markerColor);
+      if(!m) return;
+      m.color = input.value;
+      renderMarkerManager();
+      renderGantt();
+    });
+  });
+  host.querySelectorAll('[data-marker-label]').forEach(function(input){
+    input.addEventListener('change', function(){
+      var m = markerById(input.dataset.markerLabel);
+      if(!m) return;
+      m.label = input.value.trim() || m.label;
+      renderGantt();
+    });
+  });
+  host.querySelectorAll('[data-marker-date]').forEach(function(input){
+    input.addEventListener('change', function(){
+      var m = markerById(input.dataset.markerDate);
+      if(!m || m.isToday) return;
+      m.date = input.value;
+      renderGantt();
+    });
+  });
+  host.querySelectorAll('[data-marker-delete]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      markers = markers.filter(function(m){ return m.id !== btn.dataset.markerDelete; });
+      renderMarkerManager();
+      renderGantt();
+    });
+  });
+  document.getElementById('btnAddMarker').addEventListener('click', function(){
+    var nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    markers.push({
+      id: 'marker-' + Date.now(),
+      label: 'Goal',
+      date: toISO(nextWeek),
+      color: '#2da44e',
+      isToday: false
+    });
+    renderMarkerManager();
+    renderGantt();
+  });
+}
+function markerById(id) {
+  for(var i = 0; i < markers.length; i++) if(markers[i].id === id) return markers[i];
+  return null;
+}
 function setSidebarTab(tab) {
   activeSidebarTab = tab === 'phases' ? 'phases' : 'task';
   document.querySelectorAll('.sidebar-tab').forEach(function(btn){
@@ -832,6 +923,7 @@ function syncPhaseUI(keepDetail) {
   renderPhaseLabels();
   renderLegend();
   renderPhaseManager();
+  renderMarkerManager();
   refreshPhaseSelectors();
   if(keepDetail !== false && selectedId) showDetail(selectedId);
 }
@@ -856,10 +948,11 @@ function deletePhase(phaseId) {
   renderGantt();
 }
 function parseConfigPayload(data) {
-  if(Array.isArray(data)) return { tasks: data, phases: [], title: '' };
+  if(Array.isArray(data)) return { tasks: data, phases: [], markers: [], title: '' };
   return {
     tasks: Array.isArray(data.tasks) ? data.tasks : [],
     phases: Array.isArray(data.phases) ? data.phases : [],
+    markers: Array.isArray(data.markers) ? data.markers : [],
     title: data.title || ''
   };
 }
@@ -872,6 +965,10 @@ function applyLoadedConfig(data, options) {
   tasks = nextTasks;
   DEFAULT_PHASES = deepClone(phases);
   DEFAULTS = deepClone(tasks);
+  if(parsed.markers.length) {
+    markers = parsed.markers.map(function(m){ return deepClone(m); });
+  }
+  DEFAULT_MARKERS = deepClone(markers);
   if((options || {}).updateTitle && parsed.title) {
     document.getElementById('appTitle').textContent = parsed.title;
     document.title = parsed.title + ' — Gantry';
@@ -935,6 +1032,8 @@ var excludeWeekends = false;
 var excludeHolidays = false;   // holiday shading/exclusion toggle
 var holidaySet      = new Set();
 var loadedHolidayName = '';
+var markers = [{ id: 'marker-today', label: 'Today', date: '', color: '#58a6ff', isToday: true }];
+var DEFAULT_MARKERS = [{ id: 'marker-today', label: 'Today', date: '', color: '#58a6ff', isToday: true }];
 var activeDateChangeMode = null;
 var activeDateChangeTaskId = null;
 var selectedIds = [];
@@ -1250,7 +1349,11 @@ function renderGantt() {
         if(selectedId)showDetail(selectedId);
       },60);
     },
-    on_progress_change:function(){},on_view_change:function(){}
+    on_progress_change:function(task,progress){
+      var p=Math.round(progress/5)*5;
+      var m=taskMap(),t=m[task.id];
+      if(t){t.progress=p;if(p>=100)t.done=true;if(selectedId===task.id)showDetail(task.id);}
+    },on_view_change:function(){}
   });
 
   applyTimelineZoom();
@@ -1479,6 +1582,7 @@ function renderGantt() {
 
     // ── Weekend shading ────────────────────────────────────────
     drawWeekendShading(svg);
+    drawMarkers(svg);
     applyRenderedSelection(svg);
 
   },0);
@@ -1535,6 +1639,58 @@ function drawWeekendShading(svg) {
     svg.insertBefore(shadeGroup, gridLayer.nextSibling);
   } else {
     svg.appendChild(shadeGroup);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  VERTICAL MARKERS
+// ─────────────────────────────────────────────────────────────────
+function drawMarkers(svg) {
+  svg.querySelectorAll('.marker-lines').forEach(function(el){ el.parentNode.removeChild(el); });
+  if(!gantt || !gantt.gantt_start || !gantt.gantt_end || !markers.length) return;
+
+  var view = currentView();
+  var vb   = svg.viewBox && svg.viewBox.baseVal;
+  var svgH = (vb && vb.height) ? vb.height : (parseFloat(svg.getAttribute('height')) || 600);
+  var hdrH = 50;
+  var dayWidth = view === 'Week' ? (gantt.options.column_width / 7)
+               : view === 'Month' ? (gantt.options.column_width / 30)
+               : gantt.options.column_width;
+
+  var markerGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
+  markerGroup.setAttribute('class','marker-lines');
+
+  markers.forEach(function(m) {
+    if(m.isToday) m.date = toISO(new Date());
+    if(!m.date) return;
+
+    var dayIndex = daysBetween(toISO(gantt.gantt_start), m.date);
+    var x = dayIndex * dayWidth;
+
+    var line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('class','marker-line');
+    line.setAttribute('x1', String(x));
+    line.setAttribute('y1', String(hdrH));
+    line.setAttribute('x2', String(x));
+    line.setAttribute('y2', String(svgH));
+    line.setAttribute('stroke', m.color);
+    markerGroup.appendChild(line);
+
+    var label = document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('class','marker-label');
+    label.setAttribute('x', String(x + 4));
+    label.setAttribute('y', String(hdrH + 14));
+    label.setAttribute('fill', m.color);
+    label.textContent = m.label;
+    markerGroup.appendChild(label);
+  });
+
+  // Insert above bars so lines sit behind task bars but above grid/shading
+  var barLayer = svg.querySelector('.bar-wrapper');
+  if(barLayer) {
+    svg.insertBefore(markerGroup, barLayer);
+  } else {
+    svg.appendChild(markerGroup);
   }
 }
 
@@ -1704,6 +1860,7 @@ function showDetail(id) {
     '<div class="field-group"><label>Projected Finish</label><input class="field-input" type="text" value="'+escHtml(fmtDate(projectedFinish))+'" readonly /></div>'+
     '<div class="field-group"><label>Phase</label><select class="field-input" id="fPhase">'+phaseOptionsHtml(t.phase, false)+'</select></div>'+
     '<div class="checkbox-row"><input type="checkbox" id="fDone"'+(t.done?' checked':'')+' /><label for="fDone">Mark complete (100%)</label></div>'+
+    '<div class="field-group"><label>Progress <span id="fProgressVal" style="font-weight:600">'+t.progress+'%</span></label><input type="range" id="fProgress" min="0" max="100" step="5" value="'+t.progress+'" style="width:100%;accent-color:var(--accent);cursor:pointer" /></div>'+
     '<div class="checkbox-row"><input type="checkbox" id="fTbd"'+(t.tbd?' checked':'')+' /><label for="fTbd">Estimate TBD</label></div>'+
     '<div class="field-group"><label>Note</label><textarea class="field-input" id="fNote">'+escHtml(t.note||'')+'</textarea></div>'+
     '<div class="sec-title" style="margin-top:11px">Depends On — must finish before this starts <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(click &#x2715; to remove)</span></div>'+
@@ -1729,6 +1886,14 @@ function showDetail(id) {
   }
   ['fName','fAssignee','fPhase','fNote'].forEach(function(fid){document.getElementById(fid).addEventListener('change',save);});
   ['fDone','fTbd'].forEach(function(fid){document.getElementById(fid).addEventListener('change',save);});
+  document.getElementById('fProgress').addEventListener('input',function(e){
+    var v=parseInt(e.target.value,10);
+    document.getElementById('fProgressVal').textContent=v+'%';
+    t.progress=v;
+    t.done=v>=100;
+    t.custom_class=phaseClass(t);
+    renderGantt(); showDetail(id);
+  });
 
   document.getElementById('fStart').addEventListener('change',function(e){
     var ns=e.target.value; if(!ns)return;
@@ -1842,7 +2007,8 @@ document.getElementById('btnSave').addEventListener('click',function(){
     savedAt:new Date().toISOString(),
     title:document.getElementById('appTitle').textContent,
     phases:phases.map(serialisePhase),
-    tasks:tasks.map(serialiseTask)
+    tasks:tasks.map(serialiseTask),
+    markers:markers.map(serialiseMarker)
   });
 });
 document.getElementById('btnLoad').addEventListener('click',function(){ document.getElementById('fileInput').value=''; document.getElementById('fileInput').click(); });
@@ -2051,7 +2217,7 @@ document.addEventListener('keydown',function(e){
 document.getElementById('btnReset').addEventListener('click',function(){
   if(!confirm('Reset tasks and phases to the last loaded state?'))return;
   phases=deepClone(DEFAULT_PHASES);
-  tasks=deepClone(DEFAULTS); selectedId=null; exitLinkMode();
+  tasks=deepClone(DEFAULTS); markers=deepClone(DEFAULT_MARKERS); selectedId=null; exitLinkMode();
   selectedIds=[]; selectionAnchorId=null;
   timelineScrollLeft=null; userAdjustedTimelineZoom=false; shouldApplyDefaultViewport=true;
   document.getElementById('taskDetail').className=''; document.getElementById('taskDetail').innerHTML=''; document.getElementById('hint').style.display='';

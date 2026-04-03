@@ -74,7 +74,8 @@ Rules:
 - `dependencies`: comma-separated task IDs
 - `daysOfEffort` counts the start date as day 1
 - dates use `YYYY-MM-DD`
-- `done: true` shows complete styling
+- `progress`: 0–100, percentage complete
+- `done: true` shows complete styling (also sets progress to 100)
 - `tbd: true` shows estimate-TBD styling
 
 Older data with `start` and `end` still loads, but the app saves tasks back as `daysOfEffort`.
@@ -91,13 +92,37 @@ Older data with `start` and `end` still loads, but the app saves tasks back as `
 - Link mode for creating dependency arrows
 - Dependency editing in the sidebar
 - Multi-select, batch edit, and copy/paste
+- Task progress tracking via sidebar slider (0–100%, step 5) or bar drag handle
 - Done and TBD task states
 - Weekend exclusion for workday-based scheduling
 - Holiday loading and holiday shading
+- Timeline markers (labeled vertical lines for "Today", goals, milestones)
 - Light and dark theme toggle
 - JSON import and export
 - PNG and PDF export
 - Reset back to the loaded config
+
+## Timeline Markers
+
+Markers are labeled vertical lines drawn on the chart — useful for deadlines,
+milestones, or tracking today's date.
+
+- Manage markers in the **Phases** sidebar tab under **Timeline Markers**
+- Each marker has a label, date, and color
+- A **Today** marker is included by default and auto-updates its date
+- Click **+ Add Marker** to create a new marker (defaults to one week out)
+- Markers are saved and restored with JSON exports
+
+Marker format in saved JSON:
+
+```json
+{
+  "markers": [
+    { "id": "marker-today", "label": "Today", "date": "2026-04-03", "color": "#58a6ff", "isToday": true },
+    { "id": "marker-goal",  "label": "Launch", "date": "2026-06-15", "color": "#2da44e" }
+  ]
+}
+```
 
 ## Notes
 
