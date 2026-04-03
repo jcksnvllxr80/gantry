@@ -1,0 +1,98 @@
+{
+  "version": 2,
+  "savedAt": "2026-04-03T01:00:52.651Z",
+  "title": "Gantry Demo - Moonbase Snack Ops",
+  "tasks": [
+    {
+      "id": "idea-jam",
+      "name": "Idea Jam: pick the flagship snack",
+      "start": "2026-03-26",
+      "daysOfEffort": 10,
+      "progress": 100,
+      "dependencies": "",
+      "assignee": "Captain Crumb",
+      "phase": 1,
+      "done": true,
+      "tbd": false,
+      "note": "Shortlist includes Meteor Macaron, Nebula Nachos, and Comet Corn Dogs."
+    },
+    {
+      "id": "prototype-bites",
+      "name": "Prototype zero-gravity bites",
+      "start": "2026-03-31",
+      "daysOfEffort": 10,
+      "progress": 100,
+      "dependencies": "idea-jam",
+      "assignee": "Dr. Sprinkle",
+      "phase": 1,
+      "done": true,
+      "tbd": false,
+      "note": "Three recipes survived the crumb explosion tests."
+    },
+    {
+      "id": "robot-taste-panel",
+      "name": "Robot taste panel calibration",
+      "start": "2026-04-03",
+      "daysOfEffort": 10,
+      "progress": 50,
+      "dependencies": "prototype-bites",
+      "assignee": "Unit SNAX-9",
+      "phase": 1,
+      "done": false,
+      "tbd": false,
+      "note": "Current bias toward anything dusted with cinnamon."
+    },
+    {
+      "id": "packaging-art",
+      "name": "Design absurdly premium packaging",
+      "start": "2026-04-06",
+      "daysOfEffort": 10,
+      "progress": 20,
+      "dependencies": "prototype-bites",
+      "assignee": "Velvet Vega",
+      "phase": 2,
+      "done": false,
+      "tbd": false,
+      "note": "Direction: luxury cereal box meets retro space motel."
+    },
+    {
+      "id": "launch-video",
+      "name": "Shoot dramatic launch video with fog machine",
+      "start": "2026-04-23",
+      "daysOfEffort": 10,
+      "progress": 0,
+      "dependencies": "robot-taste-panel,packaging-art",
+      "assignee": "DJ Crater",
+      "phase": 2,
+      "done": false,
+      "tbd": false,
+      "note": "The script requires one heroic slow-motion chip toss."
+    },
+    {
+      "id": "gift-shop-rollout",
+      "name": "Moonbase gift shop rollout",
+      "start": "2026-05-13",
+      "daysOfEffort": 10,
+      "progress": 0,
+      "dependencies": "launch-video",
+      "assignee": "Orbit Pam",
+      "phase": 2,
+      "done": false,
+      "tbd": false,
+      "note": "Merch bundle includes snack tin, sticker sheet, and emergency napkin."
+    },
+    {
+      "id": "season-2-flavor",
+      "name": "Mystery flavor for season two",
+      "start": "2026-05-28",
+      "daysOfEffort": 10,
+      "progress": 0,
+      "dependencies": "gift-shop-rollout",
+      "assignee": "Professor Umami",
+      "phase": 2,
+      "done": false,
+      "tbd": true,
+      "note": "Candidates remain classified until legal clears the pickle glitter."
+    }
+  ]
+}

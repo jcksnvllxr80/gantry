@@ -1,0 +1,1731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gantry</title>
+  <link rel="stylesheet" href="lib/frappe-gantt.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d1117; --surface:  #161b22; --surface2: #21262d;
+      --border:  #30363d; --text:     #e6edf3; --muted:    #8b949e;
+      --accent:  #58a6ff; --danger:   #f85149; --warn:     #d29922; --green: #2da44e;
+    }
+    :root.light {
+      --bg:      #f6f8fa; --surface:  #ffffff; --surface2: #f0f2f5;
+      --border:  #d0d7de; --text:     #1f2328; --muted:    #636c76;
+    }
+    :root.light .field-input { color: var(--text); }
+
+    html,body { height:100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+    }
+
+    /* HEADER */
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 9px 14px; display: flex; align-items: center;
+      justify-content: space-between; flex-shrink: 0; gap: 10px;
+    }
+    .hdr-title h1 { font-size: 14px; font-weight: 600; white-space: nowrap; }
+    .hdr-title p  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+
+    .view-group {
+      display: flex; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+    }
+    .view-group button {
+      background: transparent; border: none; border-right: 1px solid var(--border);
+      color: var(--muted); padding: 5px 11px; font-size: 12px; cursor: pointer;
+      transition: background .12s, color .12s; white-space: nowrap;
+    }
+    .view-group button:last-child { border-right: none; }
+    .view-group button:hover  { background: var(--border); color: var(--text); }
+    .view-group button.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+    .btn {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--muted); padding: 5px 11px; font-size: 12px; cursor: pointer;
+      transition: border-color .12s, color .12s, background .12s; white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.btn-green { border-color: var(--green); color: var(--green); }
+    .btn.btn-green:hover { background: rgba(45,164,78,.12); }
+    .btn.btn-link.active { background: rgba(88,166,255,.15); border-color: var(--accent); color: var(--accent); }
+    .btn.btn-danger { border-color: var(--danger); color: var(--danger); }
+    .btn.btn-danger:hover { background: rgba(248,81,73,.1); }
+    .btn-primary { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
+    .btn-primary:hover { background: #79b8ff !important; border-color: #79b8ff !important; }
+
+    /* LAYOUT */
+    .body { display: flex; flex: 1; overflow: hidden; }
+    .gantt-pane { flex: 1; overflow: auto; padding: 14px; position: relative; }
+
+    /* ── REORDER OVERLAY ───────────────────────────────────────── */
+    #reorderOverlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    /* drop-target line with arrow knob */
+    #reorderLine {
+      position: absolute;
+      left: 0; right: 0;
+      height: 2px;
+      background: #f78166;
+      pointer-events: none;
+      display: none;
+      z-index: 12;
+    }
+    #reorderLine::before {
+      content: '';
+      position: absolute;
+      left: 4px; top: 50%;
+      transform: translateY(-50%);
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #f78166;
+    }
+    /* semi-transparent ghost of the dragged row */
+    #reorderGhost {
+      position: absolute;
+      left: 0; right: 0;
+      pointer-events: none;
+      display: none;
+      z-index: 11;
+      background: rgba(88,166,255,0.18);
+      border: 1px dashed rgba(88,166,255,0.7);
+      border-radius: 4px;
+    }
+    #selectionBox {
+      position: absolute;
+      display: none;
+      pointer-events: none;
+      z-index: 13;
+      border: 1px dashed rgba(88,166,255,.95);
+      background: rgba(88,166,255,.16);
+    }
+    .bar-wrapper .bar { cursor: grab; }
+    .bar-wrapper.selected .bar {
+      stroke: #79b8ff !important;
+      stroke-width: 2px !important;
+      filter: drop-shadow(0 0 4px rgba(88,166,255,.35));
+    }
+    .bar-wrapper.selection-primary .bar { stroke: #f2cc60 !important; }
+
+    /* ── ZOOM CONTROLS (toolbar) ───────────────────────────────── */
+    .zoom-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0 6px;
+      height: 30px;
+    }
+    .zoom-group-label {
+      font-size: 10px;
+      color: var(--muted);
+      user-select: none;
+      white-space: nowrap;
+      margin: 0 2px;
+    }
+    .zoom-group-sep {
+      width: 1px;
+      height: 16px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+    .zoom-group-btn {
+      width: 22px !important;
+      min-width: 22px !important;
+      height: 22px !important;
+      padding: 0 !important;
+      font-size: 15px !important;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .gantt-card {
+      background: #1c2128; border-radius: 8px; border: 1px solid #30363d;
+      padding: 10px 14px 14px; min-width: 700px;
+    }
+
+    /* ── DARK MODE: gantt SVG overrides (default theme) ─────────────── */
+    .gantt-card .gantt .grid-header          { fill: #161b22 !important; stroke: #30363d !important; }
+    .gantt-card .gantt .grid-row             { fill: #0d1117 !important; }
+    .gantt-card .gantt .grid-row:nth-child(even) { fill: #161b22 !important; }
+    .gantt-card .gantt .row-line             { stroke: #30363d !important; }
+    .gantt-card .gantt .tick                 { stroke: #30363d !important; }
+    .gantt-card .gantt .today-highlight      { fill: rgba(88,166,255,.1) !important; opacity: 1 !important; }
+    .gantt-card .gantt .upper-text           { fill: #8b949e !important; }
+    .gantt-card .gantt .lower-text           { fill: #e6edf3 !important; }
+    .gantt-card .gantt .bar-label            { fill: #fff !important; }
+    .gantt-card .gantt .bar-label.big        { fill: #c9d1d9 !important; }
+    .gantt-card .gantt .arrow                { stroke: #58a6ff !important; }
+
+    /* ── LIGHT MODE: revert to original frappe colours ───────────────── */
+    :root.light .gantt-card {
+      background: #fff; border-color: #d0d7de;
+    }
+    :root.light .gantt-card .gantt .grid-header          { fill: #ffffff !important; stroke: #e0e0e0 !important; }
+    :root.light .gantt-card .gantt .grid-row             { fill: #ffffff !important; }
+    :root.light .gantt-card .gantt .grid-row:nth-child(even) { fill: #f5f5f5 !important; }
+    :root.light .gantt-card .gantt .row-line             { stroke: #ebeff2 !important; }
+    :root.light .gantt-card .gantt .tick                 { stroke: #e0e0e0 !important; }
+    :root.light .gantt-card .gantt .today-highlight      { fill: #fcf8e3 !important; opacity: 0.5 !important; }
+    :root.light .gantt-card .gantt .upper-text           { fill: #555 !important; }
+    :root.light .gantt-card .gantt .lower-text           { fill: #333 !important; }
+    :root.light .gantt-card .gantt .bar-label            { fill: #fff !important; }
+    :root.light .gantt-card .gantt .bar-label.big        { fill: #555 !important; }
+    :root.light .gantt-card .gantt .arrow                { stroke: #666 !important; }
+    .weekend-shade rect.weekend-cell { fill: rgba(220,40,40,0.13); }
+    .weekend-shade rect.holiday-cell { fill: rgba(128,128,128,0.22); }
+    .weekend-shade rect.weekend-holiday-cell { fill: rgba(150,90,90,0.22); }
+    :root.light .weekend-shade rect.weekend-cell { fill: rgba(200,20,20,0.10) !important; }
+    :root.light .weekend-shade rect.holiday-cell { fill: rgba(110,110,110,0.18) !important; }
+    :root.light .weekend-shade rect.weekend-holiday-cell { fill: rgba(145,95,95,0.18) !important; }
+    .phase-labels { margin-bottom: 8px; }
+    .phase-pill {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+      padding: 3px 9px; border-radius: 20px; margin-right: 5px;
+    }
+    .phase-pill.poc  { background: #dafbe1; color: #1a7f37; }
+    .phase-pill.prod { background: #ddf4ff; color: #0550ae; }
+    .phase-pill.done { background: #eaeef2; color: #57606a; }
+    .phase-pill.tbd  { background: #fff8c5; color: #7d4e00; }
+
+    .bar-wrapper.bar-done .bar { fill: #8c959f !important; }
+    .bar-wrapper.bar-done .bar-label     { fill: #000 !important; }
+    .bar-wrapper.bar-done .bar-label.big { fill: #333 !important; }
+    .bar-wrapper.bar-poc  .bar { fill: #2da44e !important; }
+    .bar-wrapper.bar-prod .bar { fill: #0969da !important; }
+    .bar-wrapper.bar-tbd  .bar { fill: #bf8700 !important; }
+    .bar-wrapper .bar-progress  { fill: rgba(255,255,255,.28) !important; }
+    #gantt svg, #reorderOverlay { user-select: none; }
+    .today-highlight { fill: rgba(9,105,218,.06) !important; }
+    .bar-wrapper.link-source .bar { fill: #db6d28 !important; stroke: #ff9a4d !important; stroke-width: 2px !important; }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 280px; min-width: 280px; background: var(--surface);
+      border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;
+    }
+    .sidebar-inner { flex: 1; overflow-y: auto; padding: 13px; }
+    .sec-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+      color: var(--muted); margin-bottom: 7px; margin-top: 13px;
+    }
+    .sec-title:first-child { margin-top: 0; }
+    .hint-box {
+      background: rgba(88,166,255,.07); border: 1px solid rgba(88,166,255,.2);
+      border-radius: 6px; padding: 9px 11px; font-size: 12px; color: var(--muted);
+      line-height: 1.65; margin-bottom: 13px;
+    }
+    .stats-row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 13px; }
+    .stat-chip {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 3px 9px; font-size: 11px; color: var(--muted);
+    }
+    .stat-chip strong { color: var(--text); }
+
+    #taskDetail { display: none; }
+    #taskDetail.visible { display: block; }
+
+    .field-group { margin-bottom: 8px; }
+    .field-group label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+    .field-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 5px; color: var(--text); padding: 5px 8px;
+      font-size: 12px; font-family: inherit;
+    }
+    .field-input:focus { outline: none; border-color: var(--accent); }
+    textarea.field-input { resize: vertical; min-height: 50px; }
+    select.field-input option { background: var(--surface2); color: var(--text); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .checkbox-row { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); margin-bottom: 8px; cursor: pointer; }
+    .checkbox-row input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+    .checkbox-row label { cursor: pointer; }
+    .selection-list {
+      max-height: 108px;
+      overflow: auto;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .selection-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+    .dep-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .dep-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(9,105,218,.14); border: 1px solid rgba(9,105,218,.3);
+      border-radius: 6px; padding: 4px 6px 4px 10px; font-size: 12px; color: #58a6ff;
+    }
+    .dep-chip .chip-x {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 4px;
+      background: rgba(248,81,73,.18); border: 1px solid rgba(248,81,73,.45);
+      color: #f85149; cursor: pointer; font-size: 12px; line-height: 1;
+      font-weight: 700; flex-shrink: 0;
+      transition: background .12s;
+    }
+    .dep-chip .chip-x:hover { background: rgba(248,81,73,.35); }
+    .dep-empty { font-size: 12px; color: var(--muted); font-style: italic; margin-bottom: 8px; }
+
+    .dep-add-row { display: flex; gap: 6px; margin-bottom: 4px; }
+    .dep-add-row select { flex: 1; }
+    .dep-add-row .btn { padding: 4px 10px; }
+
+    .blocking-list { font-size: 12px; }
+    .bl-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 6px; margin-bottom: 4px;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    }
+    .bl-name { color: var(--text); flex: 1; font-size: 12px; }
+    .bl-rm {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0;
+      background: rgba(248,81,73,.18); border: 1px solid rgba(248,81,73,.45);
+      color: #f85149; cursor: pointer; font-size: 13px; font-weight: 700;
+      transition: background .12s;
+    }
+    .bl-rm:hover { background: rgba(248,81,73,.35); }
+
+    .dep-warn {
+      display: none; background: rgba(210,153,34,.1); border: 1px solid rgba(210,153,34,.3);
+      border-radius: 5px; padding: 6px 9px; font-size: 11px; color: var(--warn);
+      margin-top: 7px; line-height: 1.5;
+    }
+    .dep-warn.visible { display: block; }
+
+    .task-actions { display: flex; gap: 6px; margin-top: 4px; }
+    .task-actions .btn { flex: 1; text-align: center; font-size: 11px; }
+
+    .legend { margin-top: 2px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
+    .legend-swatch { width: 14px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+    /* LINK BANNER */
+    #linkBanner {
+      display: none; background: rgba(88,166,255,.12);
+      border-bottom: 1px solid rgba(88,166,255,.25);
+      padding: 6px 14px; font-size: 12px; color: var(--accent);
+      flex-shrink: 0; gap: 8px; align-items: center;
+    }
+    #linkBanner.visible { display: flex; }
+    #linkBanner .lnk-cancel { margin-left: auto; cursor: pointer; color: var(--muted); font-size: 13px; background: none; border: none; }
+    #linkBanner .lnk-cancel:hover { color: var(--danger); }
+
+    /* EXPORT SPINNER */
+    #exportStatus {
+      display: none; position: fixed; bottom: 16px; right: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 16px; font-size: 13px; color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,.4); z-index: 200;
+    }
+    #exportStatus.visible { display: block; }
+
+    /* MODAL */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.6); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; width: 400px; max-width: 95vw; max-height: 90vh;
+      overflow-y: auto; padding: 20px;
+    }
+    .modal h2 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+    .modal-footer .btn { padding: 6px 18px; font-size: 13px; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-title">
+    <h1 id="appTitle">Gantry</h1>
+    <p>Click task to edit &bull; Drag to reschedule &bull; Link tasks for dependencies</p>
+  </div>
+  <div class="hdr-right">
+    <div class="view-group" id="viewGroup">
+      <button data-view="Day">Day</button>
+      <button data-view="Week" class="active">Week</button>
+      <button data-view="Month">Month</button>
+    </div>
+    <div class="zoom-group">
+      <span class="zoom-group-label">rows</span>
+      <button class="btn zoom-group-btn" id="zoomRowOut" title="Shorter rows">&#8722;</button>
+      <button class="btn zoom-group-btn" id="zoomRowIn"  title="Taller rows">&#43;</button>
+      <span class="zoom-group-sep"></span>
+      <span class="zoom-group-label">timeline</span>
+      <button class="btn zoom-group-btn" id="zoomColOut" title="Compress timeline">&#8722;</button>
+      <button class="btn zoom-group-btn" id="zoomColIn"  title="Expand timeline">&#43;</button>
+    </div>
+    <button class="btn btn-link" id="btnLinkMode" title="Click two tasks to create a dependency arrow">&#128279; Link</button>
+    <button class="btn btn-green" id="btnAddTask">+ Add Task</button>
+    <button class="btn" id="btnWeekends" title="Toggle: exclude weekends from workday counts">&#128197; Excl. Weekends</button>
+    <button class="btn" id="btnLoadHolidays" title="Load a holidays JSON file to enable holiday exclusion">&#127981; Load Holidays</button>
+    <button class="btn" id="btnTheme" title="Toggle light / dark mode">&#9728; Light</button>
+    <button class="btn" id="btnSave" title="Download current state as JSON">&#8595; Save JSON</button>
+    <button class="btn" id="btnLoad" title="Load a saved JSON file">&#8593; Load JSON</button>
+    <button class="btn" id="btnExportPng" title="Export chart as PNG image">&#128247; PNG</button>
+    <button class="btn" id="btnExportPdf" title="Export chart as PDF">&#128196; PDF</button>
+    <button class="btn" id="btnReset">&#8635; Reset</button>
+  </div>
+</header>
+
+<div id="linkBanner">
+  <span id="linkStep">&#128279; <strong>Link mode:</strong> click the upstream task (must finish first)</span>
+  <button class="lnk-cancel" id="btnCancelLink">&#x2715; Cancel</button>
+</div>
+
+<div class="body">
+  <div class="gantt-pane" id="ganttPane">
+    <div class="gantt-card" id="ganttCard">
+      <div class="phase-labels">
+        <span class="phase-pill done">&#10003; Complete</span>
+        <span class="phase-pill poc">Phase 1 &mdash; POC</span>
+        <span class="phase-pill prod">Phase 2 &mdash; Production</span>
+        <span class="phase-pill tbd">Estimate TBD</span>
+      </div>
+      <div id="gantt"></div>
+    </div>
+    <div id="reorderOverlay"><div id="reorderLine"></div><div id="reorderGhost"></div><div id="selectionBox"></div></div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+      <div class="stats-row" id="statsRow"></div>
+
+      <div class="sec-title">Task Details</div>
+      <div class="hint-box" id="hint">
+        <strong style="color:var(--text)">Click</strong> a bar to select &amp; edit.<br>
+        <strong style="color:var(--text)">Drag</strong> to reschedule &mdash; downstream cascades.<br>
+        Click a <strong style="color:var(--text)">Phase 2 task bar</strong> to see its dependencies. Each linked task shows a <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:rgba(248,81,73,.25);border:1px solid rgba(248,81,73,.5);color:#f85149;font-weight:700;font-size:11px;">&#x2715;</span> button &mdash; click it to remove that dependency arrow.<br>
+        <strong style="color:var(--text)">Link</strong> button to draw a new dependency.<br>
+        <strong style="color:var(--text)">Save/Load JSON</strong> to persist changes.<br>
+        <strong style="color:var(--text)">PNG / PDF</strong> to export the chart.
+      </div>
+      <div id="taskDetail"></div>
+
+      <div class="sec-title">Legend</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:#8c959f"></div>Complete</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#2da44e"></div>Phase 1 &mdash; POC</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#0969da"></div>Phase 2 &mdash; Production</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#bf8700"></div>Estimate TBD</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- Add Task Modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h2>Add New Task</h2>
+    <div class="field-group"><label>Task Name *</label><input class="field-input" type="text" id="mName" placeholder="e.g. Auth Service" /></div>
+    <div class="field-group"><label>Assignee</label><input class="field-input" type="text" id="mAssignee" placeholder="Name or team" /></div>
+    <div class="field-row">
+      <div class="field-group"><label>Start Date *</label><input class="field-input" type="date" id="mStart" /></div>
+      <div class="field-group"><label>Days of Effort *</label><input class="field-input" type="number" id="mEffort" min="1" step="1" /></div>
+    </div>
+    <div class="field-group">
+      <label>Phase</label>
+      <select class="field-input" id="mPhase">
+        <option value="1">Phase 1 &mdash; POC</option>
+        <option value="2">Phase 2 &mdash; Production</option>
+      </select>
+    </div>
+    <div class="checkbox-row"><input type="checkbox" id="mTbd" /><label for="mTbd">Estimate TBD / duration unknown</label></div>
+    <div class="field-group"><label>Note</label><textarea class="field-input" id="mNote" placeholder="Optional notes..."></textarea></div>
+    <div id="mError" style="color:var(--danger);font-size:12px;margin-top:-4px;display:none;"></div>
+    <div class="modal-footer">
+      <button class="btn" id="btnModalCancel">Cancel</button>
+      <button class="btn btn-primary" id="btnModalAdd">Add Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export status toast -->
+<div id="exportStatus"></div>
+
+<!-- Hidden file input for JSON load -->
+<input type="file" id="fileInput" accept=".json,application/json" style="display:none" />
+<input type="file" id="holidayFileInput" accept=".json,application/json" style="display:none" />
+
+<script src="lib/frappe-gantt.min.js"></script>
+<script src="lib/html2canvas.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────────────────────────
+function deepClone(x)    { return JSON.parse(JSON.stringify(x)); }
+function escHtml(s)      { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function slugify(name)   { return name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')+'_'+Math.random().toString(36).slice(2,6); }
+function phaseClass(t)   { return t.done?'bar-done':t.tbd?'bar-tbd':t.phase===1?'bar-poc':'bar-prod'; }
+function taskMap()       { var m={}; tasks.forEach(function(t){m[t.id]=t;}); return m; }
+function getDeps(t)      { if(!t.dependencies)return[]; if(Array.isArray(t.dependencies))return t.dependencies.filter(Boolean); return t.dependencies.split(',').map(function(s){return s.trim();}).filter(Boolean); }
+function setDeps(t,arr)  { t.dependencies=arr.filter(Boolean).join(','); }
+function parseLocal(s)   { return new Date(s+'T00:00:00'); }
+function daysBetween(a,b){ return Math.round((parseLocal(b)-parseLocal(a))/86400000); }
+function clampEffortDays(value) {
+  var days = parseInt(value, 10);
+  return isFinite(days) && days > 0 ? days : 1;
+}
+function getTaskEffortDays(t) { return clampEffortDays(t.daysOfEffort); }
+function toISO(d) {
+  if(typeof d==='string')return d.slice(0,10);
+  // Use UTC getters — frappe creates Date objects from UTC midnight strings;
+  // local getDate() would give the wrong day in negative-UTC-offset timezones.
+  return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+}
+function shiftDate(s,days){ var d=parseLocal(s); d.setDate(d.getDate()+days); return toISO(d); }
+// Advance a date by N *workdays* (skipping weekends + holidays per toggle state)
+function shiftWorkdays(s, days) {
+  if(!excludeWeekends || days===0) return shiftDate(s, days);
+  var d = parseLocal(s);
+  var step = days > 0 ? 1 : -1;
+  var remaining = Math.abs(days);
+  while(remaining > 0) {
+    d.setDate(d.getDate() + step);
+    var iso = toISO(d);
+    var dow = d.getDay();
+    var isOff = (dow === 0 || dow === 6) || (excludeHolidays && holidaySet.has(iso));
+    if(!isOff) remaining--;
+  }
+  return toISO(d);
+}
+function workdayDelta(start, end) {
+  if(start === end) return 0;
+  return start < end ? countWorkdays(start, end) : -countWorkdays(end, start);
+}
+function taskEndDate(t) {
+  var effortDays = getTaskEffortDays(t);
+  return excludeWeekends ? shiftWorkdays(t.start, effortDays - 1) : shiftDate(t.start, effortDays - 1);
+}
+function effortFromRange(start, end) {
+  var normalizedEnd = excludeWeekends ? nextWorkday(end) : end;
+  var effortDays = excludeWeekends ? countWorkdays(start, shiftDate(normalizedEnd, 1)) : daysBetween(start, normalizedEnd) + 1;
+  return clampEffortDays(effortDays);
+}
+// Skip forward past any non-workday
+function nextWorkday(s) {
+  if(!excludeWeekends) return s;
+  var d = parseLocal(s);
+  while(true) {
+    var dow = d.getDay();
+    var iso = toISO(d);
+    var isOff = (dow === 0 || dow === 6) || (excludeHolidays && holidaySet.has(iso));
+    if(!isOff) break;
+    d.setDate(d.getDate() + 1);
+  }
+  return toISO(d);
+}
+function fmtDate(s){ return parseLocal(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+
+function buildRevDeps() {
+  var rev={}; tasks.forEach(function(t){rev[t.id]=[];});
+  tasks.forEach(function(t){ getDeps(t).forEach(function(did){ if(rev[did])rev[did].push(t.id); }); });
+  return rev;
+}
+function cascade(sid,delta,rev,tMap,vis,skipSet,movedIds) {
+  vis=vis||new Set(); if(vis.has(sid))return; vis.add(sid);
+  (rev[sid]||[]).forEach(function(did){
+    var t=tMap[did]; if(!t)return;
+    if(skipSet && skipSet.has(did)) { cascade(did,delta,rev,tMap,vis,skipSet,movedIds); return; }
+    t.start=shiftWorkdays(t.start,delta);
+    if(movedIds) movedIds.add(did);
+    cascade(did,delta,rev,tMap,vis,skipSet,movedIds);
+  });
+}
+function serialiseTask(t) {
+  return {
+    id: t.id,
+    name: t.name,
+    start: t.start,
+    daysOfEffort: getTaskEffortDays(t),
+    progress: t.progress,
+    dependencies: getDeps(t).join(','),
+    assignee: t.assignee,
+    phase: t.phase,
+    done: !!t.done,
+    tbd: !!t.tbd,
+    note: t.note || ''
+  };
+}
+
+// Normalise a task loaded from external data (ensure all fields present)
+function normalise(t) {
+  if(!t.id)           t.id           = slugify(t.name||'task');
+  if(!t.start)        t.start        = toISO(new Date());
+  if(!t.assignee)     t.assignee     = 'Unassigned';
+  if(t.done    ==null) t.done        = false;
+  if(t.tbd     ==null) t.tbd         = false;
+  if(t.phase   ==null) t.phase       = 1;
+  if(!t.note)          t.note        = '';
+  if(t.progress==null) t.progress    = 0;
+  if(!t.dependencies)  t.dependencies= '';
+  if(t.daysOfEffort==null) t.daysOfEffort = t.end ? Math.max(daysBetween(t.start, t.end) + 1, 1) : 1;
+  t.daysOfEffort = clampEffortDays(t.daysOfEffort);
+  delete t.end;
+  delete t._start;
+  delete t._end;
+  delete t._index;
+  t.custom_class = phaseClass(t);
+  return t;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────────────────────────
+// DEFAULTS populated when a JSON file is loaded.
+var DEFAULTS        = [];
+var tasks           = [];
+var gantt           = null;
+var selectedId      = null;
+var linkMode        = false;
+var linkSource      = null;
+var excludeWeekends = false;
+var excludeHolidays = false;   // holiday shading/exclusion toggle
+var holidaySet      = new Set();
+var loadedHolidayName = '';
+var activeDateChangeMode = null;
+var activeDateChangeTaskId = null;
+var selectedIds = [];
+var selectionAnchorId = null;
+var suppressBarClick = false;
+var taskClipboard = null;
+var hoverPasteTarget = null;
+var pendingDateChangeIgnoreIds = new Set();
+
+// ─────────────────────────────────────────────────────────────────
+//  RENDER
+// ─────────────────────────────────────────────────────────────────
+//  ZOOM STATE
+// ─────────────────────────────────────────────────────────────────
+var BAR_HEIGHT   = 22;   // px — vertical row height
+var COL_WIDTH    = 30;   // px — column width (horizontal zoom)
+var timelineScrollLeft = null;
+var userAdjustedTimelineZoom = false;
+var shouldApplyDefaultViewport = true;
+
+var BAR_MIN=12, BAR_MAX=60, BAR_STEP=4;
+var COL_MIN=18, COL_MAX=120, COL_STEP=8;
+
+// ─────────────────────────────────────────────────────────────────
+function currentView() {
+  var b=document.querySelector('.view-group button.active'); return b?b.dataset.view:'Week';
+}
+function ganttPane() {
+  return document.querySelector('.gantt-pane');
+}
+function ganttScrollHost() {
+  return document.querySelector('#gantt .gantt-container') || ganttPane();
+}
+function defaultColumnWidthForView(view) {
+  var pane = ganttPane();
+  var paneWidth = pane ? pane.clientWidth : 720;
+  if(view === 'Week') return Math.max(COL_MIN, Math.min(COL_MAX, Math.round((paneWidth * 7) / 60)));
+  if(view === 'Day') return Math.max(COL_MIN, Math.min(COL_MAX, Math.round(paneWidth / 60)));
+  return COL_WIDTH;
+}
+function dayWidthForView(view) {
+  if(view === 'Week') return COL_WIDTH / 7;
+  if(view === 'Month') return COL_WIDTH / 30;
+  return COL_WIDTH;
+}
+function selectionIdsValid(ids) {
+  var seen = new Set();
+  return (ids || []).filter(function(id){
+    if(seen.has(id)) return false;
+    if(!tasks.some(function(task){ return task.id===id; })) return false;
+    seen.add(id);
+    return true;
+  });
+}
+function assignSelection(ids, primaryId) {
+  selectedIds = selectionIdsValid(ids);
+  if(primaryId && selectedIds.indexOf(primaryId) !== -1) selectedId = primaryId;
+  else selectedId = selectedIds[0] || null;
+  selectionAnchorId = selectedId;
+}
+function isTaskSelected(id) {
+  return selectedIds.indexOf(id) !== -1;
+}
+function selectedTasks() {
+  return selectedIds.map(function(id){ return tasks.find(function(task){ return task.id===id; }); }).filter(Boolean);
+}
+function clearSelectionUI() {
+  selectedId = null;
+  selectedIds = [];
+  selectionAnchorId = null;
+  document.getElementById('taskDetail').className='';
+  document.getElementById('taskDetail').innerHTML='';
+  document.getElementById('hint').style.display='';
+}
+function applyRenderedSelection(svg) {
+  if(!svg) return;
+  selectedIds.forEach(function(id, index){
+    var wrapper = svg.querySelector('.bar-wrapper[data-id="'+id+'"]');
+    if(!wrapper) return;
+    wrapper.classList.add('selected');
+    if(index === 0 || id === selectedId) wrapper.classList.add('selection-primary');
+  });
+}
+function updateSelection(ids, primaryId) {
+  assignSelection(ids, primaryId);
+  renderGantt();
+  if(selectedId) showDetail(selectedId);
+  else clearSelectionUI();
+}
+function queueIgnoredDateChanges(ids) {
+  (ids || []).forEach(function(id){
+    if(id) pendingDateChangeIgnoreIds.add(id);
+  });
+}
+function consumeIgnoredDateChange(id) {
+  if(!id || !pendingDateChangeIgnoreIds.has(id)) return false;
+  pendingDateChangeIgnoreIds.delete(id);
+  return true;
+}
+function taskIndexById(id) {
+  return tasks.findIndex(function(task){ return task.id===id; });
+}
+function orderedSelectedTaskIds() {
+  return selectionIdsValid(selectedIds).slice().sort(function(a, b){ return taskIndexById(a) - taskIndexById(b); });
+}
+function isTextEditingTarget(el) {
+  if(!el) return false;
+  var tag = (el.tagName || '').toUpperCase();
+  return !!el.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+function copiedTaskName(name) {
+  return 'copy of ' + (name || 'task');
+}
+function svgViewboxScale(svg) {
+  var vb = svg && svg.viewBox && svg.viewBox.baseVal;
+  var rect = svg ? svg.getBoundingClientRect() : null;
+  return {
+    x: (vb && vb.width && rect && rect.width) ? rect.width / vb.width : 1,
+    y: (vb && vb.height && rect && rect.height) ? rect.height / vb.height : 1
+  };
+}
+function calcRowIndexFromClientY(svg, clientY) {
+  if(!svg) return tasks.length;
+  var HDR = 50, FPAD = 18;
+  var rowH = BAR_HEIGHT + FPAD;
+  var rect = svg.getBoundingClientRect();
+  var scale = svgViewboxScale(svg);
+  var pyVB = (clientY - rect.top) / scale.y;
+  if(pyVB <= HDR) return 0;
+  for(var j=0; j<tasks.length; j++) {
+    if(pyVB < HDR + FPAD/2 + j*rowH + BAR_HEIGHT/2) return j;
+  }
+  return tasks.length;
+}
+function calcDateFromClientX(svg, clientX) {
+  if(!svg || !gantt || !gantt.gantt_start) return null;
+  var rect = svg.getBoundingClientRect();
+  var scale = svgViewboxScale(svg);
+  var pxVB = (clientX - rect.left) / scale.x;
+  var view = currentView();
+  var dayWidth = view === 'Week' ? (gantt.options.column_width / 7) : gantt.options.column_width;
+  var dayIndex = Math.max(0, Math.floor(pxVB / dayWidth));
+  var start = shiftDate(toISO(gantt.gantt_start), dayIndex);
+  return excludeWeekends ? nextWorkday(start) : start;
+}
+function updateHoverPasteTarget(svg, evt) {
+  if(!svg || !evt) return;
+  var wrapper = evt.target.closest('.bar-wrapper');
+  var hoveredId = wrapper ? wrapper.getAttribute('data-id') : null;
+  var rowIndex = hoveredId ? taskIndexById(hoveredId) : calcRowIndexFromClientY(svg, evt.clientY);
+  if(rowIndex < 0) rowIndex = tasks.length;
+  hoverPasteTarget = {
+    rowIndex: Math.max(0, Math.min(rowIndex, tasks.length)),
+    start: calcDateFromClientX(svg, evt.clientX),
+    hoveredId: hoveredId
+  };
+}
+function copySelectionToClipboard() {
+  var orderedIds = orderedSelectedTaskIds();
+  if(!orderedIds.length) return false;
+  var picked = orderedIds.map(function(id){ return tasks.find(function(task){ return task.id===id; }); }).filter(Boolean);
+  if(!picked.length) return false;
+  var anchor = picked[0];
+  taskClipboard = {
+    tasks: picked.map(function(task){
+      return {
+        sourceId: task.id,
+        task: deepClone(serialiseTask(task)),
+        startOffset: excludeWeekends ? workdayDelta(anchor.start, task.start) : daysBetween(anchor.start, task.start)
+      };
+    })
+  };
+  return true;
+}
+function pasteClipboardAtHover() {
+  if(!taskClipboard || !taskClipboard.tasks || !taskClipboard.tasks.length || !hoverPasteTarget) return false;
+  var baseStart = hoverPasteTarget.start || taskClipboard.tasks[0].task.start;
+  if(excludeWeekends) baseStart = nextWorkday(baseStart);
+  var insertIndex = Math.max(0, Math.min(hoverPasteTarget.rowIndex, tasks.length));
+  var newTasks = [];
+  var idMap = {};
+
+  taskClipboard.tasks.forEach(function(entry){
+    var clone = normalise(deepClone(entry.task));
+    clone.name = copiedTaskName(entry.task.name);
+    clone.id = slugify(clone.name);
+    clone.start = excludeWeekends ? shiftWorkdays(baseStart, entry.startOffset) : shiftDate(baseStart, entry.startOffset);
+    clone.custom_class = phaseClass(clone);
+    idMap[entry.sourceId] = clone.id;
+    newTasks.push(clone);
+  });
+
+  newTasks.forEach(function(clone, index){
+    var originalDeps = getDeps(taskClipboard.tasks[index].task);
+    setDeps(clone, originalDeps.map(function(depId){ return idMap[depId] || depId; }));
+  });
+
+  tasks.splice.apply(tasks, [insertIndex, 0].concat(newTasks));
+  updateSelection(newTasks.map(function(task){ return task.id; }), newTasks[0].id);
+  return true;
+}
+function applySelectionShift(baseId, delta) {
+  if(delta===0) return;
+  var tMap2 = taskMap();
+  var skipSet = new Set(selectedIds);
+  var rev = buildRevDeps();
+  var vis = new Set();
+  var movedIds = new Set();
+  selectedIds.forEach(function(id){
+    if(id===baseId) return;
+    var task = tMap2[id]; if(!task) return;
+    task.start = excludeWeekends ? shiftWorkdays(task.start, delta) : shiftDate(task.start, delta);
+    movedIds.add(id);
+  });
+  selectedIds.forEach(function(id){
+    cascade(id, delta, rev, tMap2, vis, skipSet, movedIds);
+  });
+  queueIgnoredDateChanges(Array.from(movedIds));
+}
+function applySelectionEffortDelta(baseId, delta) {
+  if(delta===0) return;
+  var tMap2 = taskMap();
+  selectedIds.forEach(function(id){
+    if(id===baseId) return;
+    var task = tMap2[id]; if(!task) return;
+    task.daysOfEffort = clampEffortDays(getTaskEffortDays(task) + delta);
+  });
+}
+function taskNamesList(items) {
+  return items.map(function(task){ return '<div>'+escHtml(task.name)+'</div>'; }).join('');
+}
+function restoreTimelineViewport() {
+  var host = ganttScrollHost();
+  if(!host || !gantt) return;
+  if(timelineScrollLeft != null) {
+    host.scrollLeft = timelineScrollLeft;
+    return;
+  }
+  if(!shouldApplyDefaultViewport) return;
+  var view = currentView();
+  if(view !== 'Week' && view !== 'Day') return;
+  var today = toISO(new Date());
+  var x = daysBetween(toISO(gantt.gantt_start), today) * dayWidthForView(view);
+  var target = Math.max(0, x - host.clientWidth / 3);
+  host.scrollLeft = target;
+  shouldApplyDefaultViewport = false;
+}
+function applyTimelineZoom() {
+  if(!gantt) return;
+  if(gantt.options.column_width === COL_WIDTH) return;
+  gantt.options.column_width = COL_WIDTH;
+  gantt.render();
+}
+function renderGantt() {
+  // Guard: frappe crashes on empty task list
+  if (!tasks.length) { document.getElementById('gantt').innerHTML=''; updateStats(); return; }
+
+  hoverPasteTarget = null;
+  var host = ganttScrollHost();
+  if(host) timelineScrollLeft = shouldApplyDefaultViewport ? null : host.scrollLeft;
+  if(!userAdjustedTimelineZoom) COL_WIDTH = defaultColumnWidthForView(currentView());
+
+  // Build display copy with derived end dates so persisted task data only stores effort.
+  var displayTasks = tasks.map(function(t) {
+    var copy = deepClone(t);
+    copy.end = taskEndDate(copy);
+    return copy;
+  });
+  displayTasks.forEach(function(t){ if(Array.isArray(t.dependencies)) t.dependencies=t.dependencies.filter(Boolean).join(','); });
+  document.getElementById('gantt').innerHTML='';
+  gantt=new Gantt('#gantt',displayTasks,{
+    header_height:50,column_width:COL_WIDTH,step:24,bar_height:BAR_HEIGHT,bar_corner_radius:4,
+    arrow_curve:5,padding:18,view_mode:currentView(),date_format:'YYYY-MM-DD',language:'en',
+    popup_trigger:'mouseenter',        // tooltip on hover; click is ours
+    custom_popup_html:null,
+    on_click:function(task){handleBarClick(task.id);},  // frappe fires this on dblclick
+    on_date_change:function(task,start,end){
+      if(!activeDateChangeTaskId) {
+        consumeIgnoredDateChange(task.id);
+        return;
+      }
+      if(task.id !== activeDateChangeTaskId) {
+        consumeIgnoredDateChange(task.id);
+        return;
+      }
+      var tMap2=taskMap(),t=tMap2[task.id]; if(!t)return;
+      var rawStart=toISO(start), rawEnd=toISO(end), rawFinish=shiftDate(rawEnd, -1);
+      var oldStart=t.start, oldEffort=getTaskEffortDays(t);
+      var isMove=activeDateChangeMode==='move' && activeDateChangeTaskId===task.id;
+      var targetIds=isTaskSelected(task.id)?selectedIds.slice():[task.id];
+      var movedIds = new Set();
+
+      t.start=excludeWeekends ? nextWorkday(rawStart) : rawStart;
+      t.daysOfEffort=isMove ? oldEffort : effortFromRange(t.start, rawFinish);
+      if(isMove && targetIds.length > 1) {
+        applySelectionShift(task.id, excludeWeekends ? workdayDelta(oldStart, t.start) : daysBetween(oldStart, t.start));
+      } else if(!isMove && targetIds.length > 1) {
+        applySelectionEffortDelta(task.id, getTaskEffortDays(t) - oldEffort);
+      }
+      var startShift=excludeWeekends ? workdayDelta(oldStart, t.start) : daysBetween(oldStart, t.start);
+      if(startShift!==0)cascade(task.id,startShift,buildRevDeps(),tMap2,new Set(),targetIds.length>1?new Set(targetIds):null,movedIds);
+      queueIgnoredDateChanges(Array.from(movedIds));
+      setTimeout(function(){
+        activeDateChangeMode = null;
+        activeDateChangeTaskId = null;
+        renderGantt();
+        if(selectedId)showDetail(selectedId);
+      },60);
+    },
+    on_progress_change:function(){},on_view_change:function(){}
+  });
+
+  applyTimelineZoom();
+  restoreTimelineViewport();
+
+  // frappe-gantt fires on_click on dblclick; we want SINGLE click to open sidebar.
+  // We also intercept mousedown in the capture phase so we can distinguish
+  // vertical drag (row reorder) vs horizontal drag (date change, frappe's job).
+  setTimeout(function(){
+    var svg=document.querySelector('#gantt svg');
+    if(!svg)return;
+
+    // Flag so our re-dispatched synthetic event is not re-intercepted
+    var passthroughNext = false;
+
+    svg.addEventListener('click', function(e){
+      if(suppressBarClick){ suppressBarClick=false; return; }
+      var wrapper=e.target.closest('.bar-wrapper');
+      if(!wrapper)return;
+      var id=wrapper.getAttribute('data-id');
+      if(id)handleBarClick(id,e);
+    });
+
+    // Hide frappe popup on mouseleave (frappe's mouseenter-triggered popup doesn't always auto-hide)
+    svg.addEventListener('mouseleave', function(){
+      hoverPasteTarget = null;
+      var popup = document.querySelector('.gantt-container .popup-wrapper');
+      if(popup) popup.style.display='none';
+    });
+    svg.addEventListener('mouseover', function(e){
+      updateHoverPasteTarget(svg, e);
+      if(!e.target.closest('.bar-wrapper')){
+        var popup = document.querySelector('.gantt-container .popup-wrapper');
+        if(popup) popup.style.display='none';
+      }
+    });
+    svg.addEventListener('mousemove', function(e){
+      updateHoverPasteTarget(svg, e);
+    });
+
+    svg.addEventListener('mousedown', function(e){
+      // Don't intercept handle drags (frappe resize handles) or passthrough events
+      if(passthroughNext){ passthroughNext=false; return; }
+      if(e.target.closest('.handle')) {
+        var handleWrapper = e.target.closest('.bar-wrapper');
+        var handleId = handleWrapper ? handleWrapper.getAttribute('data-id') : null;
+        if(handleId && !isTaskSelected(handleId) && !e.shiftKey && !e.ctrlKey && !e.metaKey) assignSelection([handleId], handleId);
+        activeDateChangeMode = 'resize';
+        activeDateChangeTaskId = handleId;
+        return;
+      }
+      var wrapper=e.target.closest('.bar-wrapper');
+      if(!wrapper){
+        if(linkMode) return;
+        var pane = document.getElementById('ganttPane');
+        var paneRect = pane.getBoundingClientRect();
+        var selectionBox = document.getElementById('selectionBox');
+        var originX = e.clientX - paneRect.left + pane.scrollLeft;
+        var originY = e.clientY - paneRect.top + pane.scrollTop;
+        var additive = e.shiftKey;
+        var toggle = e.ctrlKey || e.metaKey;
+        function onMarqueeMove(me){
+          var currentX = me.clientX - paneRect.left + pane.scrollLeft;
+          var currentY = me.clientY - paneRect.top + pane.scrollTop;
+          selectionBox.style.left = Math.min(originX, currentX) + 'px';
+          selectionBox.style.top = Math.min(originY, currentY) + 'px';
+          selectionBox.style.width = Math.abs(currentX-originX) + 'px';
+          selectionBox.style.height = Math.abs(currentY-originY) + 'px';
+          selectionBox.style.display = 'block';
+        }
+        function onMarqueeUp(me){
+          document.removeEventListener('mousemove', onMarqueeMove);
+          document.removeEventListener('mouseup', onMarqueeUp);
+          selectionBox.style.display = 'none';
+          var endX = me.clientX - paneRect.left + pane.scrollLeft;
+          var endY = me.clientY - paneRect.top + pane.scrollTop;
+          if(Math.abs(endX-originX) < 4 && Math.abs(endY-originY) < 4) {
+            if(!additive && !toggle) updateSelection([], null);
+            return;
+          }
+          var hitRect = { left: Math.min(originX, endX), right: Math.max(originX, endX), top: Math.min(originY, endY), bottom: Math.max(originY, endY) };
+          var nextIds = toggle || additive ? selectedIds.slice() : [];
+          Array.from(svg.querySelectorAll('.bar-wrapper')).forEach(function(el){
+            var box = el.getBoundingClientRect();
+            var local = {
+              left: box.left - paneRect.left + pane.scrollLeft,
+              right: box.right - paneRect.left + pane.scrollLeft,
+              top: box.top - paneRect.top + pane.scrollTop,
+              bottom: box.bottom - paneRect.top + pane.scrollTop
+            };
+            var hit = !(local.right < hitRect.left || local.left > hitRect.right || local.bottom < hitRect.top || local.top > hitRect.bottom);
+            if(!hit) return;
+            var barId = el.getAttribute('data-id');
+            if(toggle) {
+              if(nextIds.indexOf(barId) === -1) nextIds.push(barId);
+              else nextIds = nextIds.filter(function(id){ return id!==barId; });
+            } else if(nextIds.indexOf(barId) === -1) nextIds.push(barId);
+          });
+          updateSelection(nextIds, nextIds[0] || null);
+        }
+        document.addEventListener('mousemove', onMarqueeMove);
+        document.addEventListener('mouseup', onMarqueeUp);
+        return;
+      }
+
+      // Block frappe from seeing this mousedown — we decide who gets it
+      e.stopImmediatePropagation();
+
+      var rdId   = wrapper.getAttribute('data-id');
+      if(!isTaskSelected(rdId) && !e.shiftKey && !e.ctrlKey && !e.metaKey) assignSelection([rdId], rdId);
+      var startX = e.clientX, startY = e.clientY;
+      var decided = false;
+
+      // ── helper: row reorder ────────────────────────────────────
+      var line    = document.getElementById('reorderLine');
+      var ghost   = document.getElementById('reorderGhost');
+      var pane    = document.getElementById('ganttPane');
+      var FPAD=18, HDR=50;
+      var rowH = BAR_HEIGHT + FPAD;
+      var vb   = svg.viewBox && svg.viewBox.baseVal;
+
+      function calcDropIndex(clientY){
+        var svgR  = svg.getBoundingClientRect();
+        var scY   = (vb && vb.height && svgR.height) ? svgR.height / vb.height : 1;
+        var pyVB  = (clientY - svgR.top) / scY;
+        for(var j=0; j<tasks.length; j++){
+          if(pyVB < HDR + FPAD/2 + j*rowH + BAR_HEIGHT/2) return j;
+        }
+        return tasks.length;
+      }
+      function showLine(idx){
+        var svgR = svg.getBoundingClientRect();
+        var scY  = (vb && vb.height && svgR.height) ? svgR.height / vb.height : 1;
+        var paneR = pane.getBoundingClientRect();
+        var vbY;
+        if(idx<=0)                vbY = HDR + FPAD/2;
+        else if(idx>=tasks.length) vbY = HDR + FPAD/2 + (tasks.length-1)*rowH + BAR_HEIGHT + FPAD/2;
+        else                       vbY = HDR + FPAD/2 + idx*rowH;
+        line.style.top     = (svgR.top - paneR.top + pane.scrollTop + vbY*scY - 1) + 'px';
+        line.style.display = 'block';
+      }
+      function showGhost(currentClientY){
+        var svgR  = svg.getBoundingClientRect();
+        var scY   = (vb && vb.height && svgR.height) ? svgR.height / vb.height : 1;
+        var paneR = pane.getBoundingClientRect();
+        // ghost tracks cursor vertically, same height as a bar row
+        var ghostH = BAR_HEIGHT * scY;
+        var ghostTop = currentClientY - paneR.top + pane.scrollTop - ghostH / 2;
+        // clamp within SVG bounds
+        var svgTop  = svgR.top - paneR.top + pane.scrollTop + HDR * scY;
+        var svgBot  = svgR.top - paneR.top + pane.scrollTop + (HDR + FPAD/2 + tasks.length * rowH) * scY;
+        ghostTop = Math.max(svgTop, Math.min(ghostTop, svgBot - ghostH));
+        ghost.style.top     = ghostTop + 'px';
+        ghost.style.height  = ghostH + 'px';
+        ghost.style.display = 'block';
+      }
+
+      var rdIdx = -1;
+
+      function onDecide(me){
+        var dx=Math.abs(me.clientX-startX), dy=Math.abs(me.clientY-startY);
+        if(dx<4 && dy<4) return;
+        decided=true;
+        document.removeEventListener('mousemove', onDecide);
+
+        if(dy >= dx){
+          // ── VERTICAL: row reorder mode ───────────────────────
+          rdIdx = calcDropIndex(me.clientY);
+          showLine(rdIdx);
+          showGhost(me.clientY);
+
+          function onReorderMove(me2){
+            me2.preventDefault();
+            rdIdx = calcDropIndex(me2.clientY);
+            showLine(rdIdx);
+            showGhost(me2.clientY);
+          }
+          function onReorderUp(){
+            line.style.display  = 'none';
+            ghost.style.display = 'none';
+            document.removeEventListener('mousemove', onReorderMove);
+            document.removeEventListener('mouseup',   onReorderUp);
+            document.removeEventListener('mouseup',   onEarlyUp);
+            suppressBarClick = true;
+            if(rdIdx===-1) return;
+            var src=tasks.findIndex(function(t){return t.id===rdId;});
+            if(src===-1) return;
+            var ins=rdIdx>src ? rdIdx-1 : rdIdx;
+            if(ins===src) return;
+            var tt=tasks.splice(src,1)[0];
+            tasks.splice(ins,0,tt);
+            renderGantt();
+            if(selectedId)showDetail(selectedId);
+          }
+          document.addEventListener('mousemove', onReorderMove);
+          document.addEventListener('mouseup',   onReorderUp);
+
+        } else {
+          // ── HORIZONTAL: hand off to frappe ────────────────────
+          document.removeEventListener('mouseup', onEarlyUp);
+          suppressBarClick = true;
+          activeDateChangeMode = 'move';
+          activeDateChangeTaskId = rdId;
+          passthroughNext = true;
+          var synth = new MouseEvent('mousedown',{
+            bubbles:true, cancelable:true,
+            clientX:startX, clientY:startY,
+            screenX:e.screenX, screenY:e.screenY,
+            button:e.button, buttons:e.buttons
+          });
+          // Dispatch on the exact original target so frappe's delegated listener resolves correctly
+          e.target.dispatchEvent(synth);
+        }
+      }
+
+      function onEarlyUp(){
+        document.removeEventListener('mousemove', onDecide);
+        document.removeEventListener('mouseup',   onEarlyUp);
+        // Released without enough movement — treat as click (sidebar already handles it via click event)
+      }
+
+      document.addEventListener('mousemove', onDecide);
+      document.addEventListener('mouseup',   onEarlyUp);
+
+    }, true); // ← capture phase: fires before frappe's bubble-phase delegate listener
+
+    // ── Weekend shading ────────────────────────────────────────
+    drawWeekendShading(svg);
+    applyRenderedSelection(svg);
+
+  },0);
+
+  if(linkSource)highlightLinkSource(linkSource);
+  updateStats();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  WEEKEND SHADING
+// ─────────────────────────────────────────────────────────────────
+function drawWeekendShading(svg) {
+  svg.querySelectorAll('.weekend-shade').forEach(function(el){ el.parentNode.removeChild(el); });
+  if(!gantt || !gantt.gantt_start || !gantt.gantt_end) return;
+
+  var view = currentView();
+  if(view === 'Month') return;
+
+  var vb   = svg.viewBox && svg.viewBox.baseVal;
+  var svgH = (vb && vb.height) ? vb.height : (parseFloat(svg.getAttribute('height')) || 600);
+  var hdrH = 50;
+  var dayWidth = view === 'Week' ? (gantt.options.column_width / 7) : gantt.options.column_width;
+  var ganttStart = parseLocal(toISO(gantt.gantt_start));
+  var ganttEnd = parseLocal(toISO(gantt.gantt_end));
+  if(!ganttStart || !ganttEnd) return;
+
+  var shadeGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
+  shadeGroup.setAttribute('class','weekend-shade');
+
+  for(var date = new Date(ganttStart); date < ganttEnd; date.setDate(date.getDate() + 1)) {
+    var iso = toISO(date);
+    var dow = date.getDay();
+    var isWeekend = (dow === 0 || dow === 6);
+    var isHoliday = holidaySet.has(iso);
+    if(!isWeekend && !isHoliday) continue;
+
+    var dayIndex = daysBetween(toISO(ganttStart), iso);
+    var x = dayIndex * dayWidth;
+
+    var rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x', String(x));
+    rect.setAttribute('y', String(hdrH));
+    rect.setAttribute('width', String(dayWidth));
+    rect.setAttribute('height', String(svgH - hdrH));
+    rect.setAttribute('class', isWeekend && isHoliday ? 'weekend-holiday-cell' : (isHoliday ? 'holiday-cell' : 'weekend-cell'));
+    rect.setAttribute('pointer-events','none');
+    shadeGroup.appendChild(rect);
+  }
+
+  // Must go AFTER the <g class="grid"> layer (which has opaque row backgrounds)
+  // but BEFORE bars. Insert after grid group.
+  var gridLayer = svg.querySelector('g.grid');
+  if(gridLayer && gridLayer.nextSibling) {
+    svg.insertBefore(shadeGroup, gridLayer.nextSibling);
+  } else {
+    svg.appendChild(shadeGroup);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  LINK MODE
+// ─────────────────────────────────────────────────────────────────
+function enterLinkMode(){
+  linkMode=true;linkSource=null;
+  document.getElementById('btnLinkMode').classList.add('active');
+  document.getElementById('linkBanner').classList.add('visible');
+  document.getElementById('linkStep').innerHTML='&#128279; <strong>Link mode:</strong> click the <em>upstream</em> task first';
+}
+function exitLinkMode(){
+  linkMode=false;linkSource=null;
+  document.getElementById('btnLinkMode').classList.remove('active');
+  document.getElementById('linkBanner').classList.remove('visible');
+  document.querySelectorAll('.bar-wrapper.link-source').forEach(function(el){el.classList.remove('link-source');});
+}
+function highlightLinkSource(id){
+  document.querySelectorAll('.bar-wrapper.link-source').forEach(function(el){el.classList.remove('link-source');});
+  var el=document.querySelector('.bar-wrapper[data-id="'+id+'"]');
+  if(el)el.classList.add('link-source');
+}
+function handleBarClick(id, evt){
+  if(linkMode){
+    if(!linkSource){
+      linkSource=id; highlightLinkSource(id);
+      var name=(tasks.find(function(t){return t.id===id;})||{}).name||id;
+      document.getElementById('linkStep').innerHTML='&#128279; <strong>Upstream: &ldquo;'+escHtml(name)+'&rdquo;</strong> &mdash; now click the <em>downstream</em> task';
+      return;
+    }
+    if(id===linkSource){
+      linkSource=null;
+      document.querySelectorAll('.bar-wrapper.link-source').forEach(function(el){el.classList.remove('link-source');});
+      document.getElementById('linkStep').innerHTML='&#128279; <strong>Link mode:</strong> click the <em>upstream</em> task first';
+      return;
+    }
+    var tMap2=taskMap(),downstream=tMap2[id]; if(!downstream){exitLinkMode();return;}
+    var ex=getDeps(downstream);
+    if(!ex.includes(linkSource)){ex.push(linkSource);setDeps(downstream,ex);}
+    exitLinkMode(); renderGantt(); showDetail(id);
+    return;
+  }
+  var shiftLike = evt && evt.shiftKey;
+  var ctrlLike = evt && (evt.ctrlKey || evt.metaKey);
+  if(ctrlLike){
+    if(isTaskSelected(id)) updateSelection(selectedIds.filter(function(sel){ return sel!==id; }), selectedId===id ? null : selectedId);
+    else updateSelection(selectedIds.concat(id), id);
+    return;
+  }
+  if(shiftLike){
+    if(!isTaskSelected(id)) updateSelection(selectedIds.concat(id), id);
+    else showDetail(id);
+    return;
+  }
+  updateSelection([id], id);
+}
+
+function showMultiDetail(id, chosen) {
+  var primary = tasks.find(function(task){ return task.id===id; }) || chosen[0];
+  var detail=document.getElementById('taskDetail');
+  document.getElementById('hint').style.display='none';
+  detail.className='visible';
+  detail.innerHTML=
+    '<div class="field-group"><label>Selected Tasks</label><div class="selection-list">'+taskNamesList(chosen)+'</div></div>'+
+    '<div class="field-group"><label>Batch Assignee</label><input class="field-input" type="text" id="mfAssignee" value="'+escHtml(primary.assignee||'')+'" /></div>'+
+    '<div class="field-row">'+
+      '<div class="field-group"><label>Move By Start</label><input class="field-input" type="date" id="mfStart" value="'+primary.start+'" /></div>'+
+      '<div class="field-group"><label>Resize By Effort</label><input class="field-input" type="number" id="mfEffort" min="1" step="1" value="'+getTaskEffortDays(primary)+'" /></div>'+
+    '</div>'+
+    '<div class="field-group"><label>Batch Phase</label><select class="field-input" id="mfPhase">'+
+      '<option value="1"'+(primary.phase===1?' selected':'')+'>Phase 1 &mdash; POC</option>'+
+      '<option value="2"'+(primary.phase===2?' selected':'')+'>Phase 2 &mdash; Production</option>'+
+    '</select></div>'+
+    '<div class="checkbox-row"><input type="checkbox" id="mfDone"'+(primary.done?' checked':'')+' /><label for="mfDone">Mark complete (100%)</label></div>'+
+    '<div class="checkbox-row"><input type="checkbox" id="mfTbd"'+(primary.tbd?' checked':'')+' /><label for="mfTbd">Estimate TBD</label></div>'+
+    '<div class="field-group"><label>Batch Note</label><textarea class="field-input" id="mfNote">'+escHtml(primary.note||'')+'</textarea></div>'+
+    '<div class="selection-actions"><button class="btn" id="btnClearSelection">Clear Selection</button><button class="btn btn-danger" id="btnDeleteSelection">Delete Selected</button></div>';
+
+  function batchSaveMeta(){
+    var assignee=document.getElementById('mfAssignee').value.trim();
+    var phase=parseInt(document.getElementById('mfPhase').value,10);
+    var done=document.getElementById('mfDone').checked;
+    var tbd=document.getElementById('mfTbd').checked;
+    var note=document.getElementById('mfNote').value.trim();
+    chosen.forEach(function(task){
+      task.assignee=assignee;
+      task.phase=phase;
+      task.done=done;
+      task.tbd=tbd;
+      task.note=note;
+      task.custom_class=phaseClass(task);
+      if(done) task.progress=100;
+    });
+    renderGantt(); showDetail(id);
+  }
+  ['mfAssignee','mfPhase','mfNote'].forEach(function(fid){document.getElementById(fid).addEventListener('change',batchSaveMeta);});
+  ['mfDone','mfTbd'].forEach(function(fid){document.getElementById(fid).addEventListener('change',batchSaveMeta);});
+  document.getElementById('mfStart').addEventListener('change',function(e){
+    var ns=e.target.value; if(!ns)return;
+    var nextStart=excludeWeekends ? nextWorkday(ns) : ns;
+    var delta=excludeWeekends ? workdayDelta(primary.start,nextStart) : daysBetween(primary.start,nextStart);
+    if(delta===0) return;
+    var tMap2=taskMap(), rev=buildRevDeps(), skipSet=new Set(selectedIds), vis=new Set();
+    chosen.forEach(function(task){ task.start = excludeWeekends ? shiftWorkdays(task.start, delta) : shiftDate(task.start, delta); });
+    chosen.forEach(function(task){ cascade(task.id, delta, rev, tMap2, vis, skipSet); });
+    renderGantt(); showDetail(id);
+  });
+  document.getElementById('mfEffort').addEventListener('change',function(e){
+    var nextEffort=clampEffortDays(e.target.value);
+    var delta=nextEffort-getTaskEffortDays(primary);
+    chosen.forEach(function(task){ task.daysOfEffort=clampEffortDays(getTaskEffortDays(task)+delta); });
+    renderGantt(); showDetail(id);
+  });
+  document.getElementById('btnClearSelection').addEventListener('click',function(){ clearSelectionUI(); renderGantt(); });
+  document.getElementById('btnDeleteSelection').addEventListener('click',function(){
+    if(!confirm('Delete '+chosen.length+' selected tasks?\nAlso removes them from all dependency lists.'))return;
+    var removeSet=new Set(selectedIds);
+    tasks.forEach(function(task){ setDeps(task, getDeps(task).filter(function(dep){ return !removeSet.has(dep); })); });
+    tasks=tasks.filter(function(task){ return !removeSet.has(task.id); });
+    clearSelectionUI();
+    renderGantt();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  SIDEBAR — TASK DETAIL
+// ─────────────────────────────────────────────────────────────────
+function showDetail(id) {
+  if(!isTaskSelected(id)) assignSelection([id], id);
+  selectedId=id;
+  var chosen=selectedTasks();
+  if(chosen.length>1){ showMultiDetail(id, chosen); return; }
+  var t=tasks.find(function(x){return x.id===id;}); if(!t)return;
+  document.getElementById('hint').style.display='none';
+  var tMap2=taskMap(),rev=buildRevDeps(),deps=getDeps(t);
+  var effortDays=getTaskEffortDays(t);
+  var projectedFinish=taskEndDate(t);
+  var conflicts=deps.filter(function(did){var d=tMap2[did];return d&&t.start<taskEndDate(d);}).map(function(did){return tMap2[did].name;});
+  var blockedBy=rev[id]||[];
+
+  var depChipsHtml=deps.length
+    ? deps.map(function(did){
+        var dn=(tMap2[did]||{}).name||did;
+        return '<span class="dep-chip">'+escHtml(dn)+'<button class="chip-x" data-remove="'+did+'" title="Delete this dependency link">&#x2715;</button></span>';
+      }).join('')
+    : '<div class="dep-empty">No dependencies</div>';
+
+  var addOpts=tasks.filter(function(x){return x.id!==id&&!deps.includes(x.id);})
+    .map(function(x){return '<option value="'+x.id+'">'+escHtml(x.name)+'</option>';}).join('');
+
+  var blockedHtml=blockedBy.length
+    ? blockedBy.map(function(bid){
+        var bn=(tMap2[bid]||{}).name||bid;
+        return '<div class="bl-item"><span class="bl-name">'+escHtml(bn)+'</span><button class="bl-rm" data-unblock="'+bid+'" title="Remove: this task no longer blocked by current">&#x2715;</button></div>';
+      }).join('')
+    : '<div style="font-size:12px;color:var(--muted);font-style:italic">Nothing blocked</div>';
+
+  var detail=document.getElementById('taskDetail');
+  detail.className='visible';
+  detail.innerHTML=
+    '<div class="field-group"><label>Task Name</label><input class="field-input" type="text" id="fName" value="'+escHtml(t.name)+'" /></div>'+
+    '<div class="field-group"><label>Assignee</label><input class="field-input" type="text" id="fAssignee" value="'+escHtml(t.assignee)+'" /></div>'+
+    '<div class="field-row">'+
+      '<div class="field-group"><label>Start</label><input class="field-input" type="date" id="fStart" value="'+t.start+'" /></div>'+
+      '<div class="field-group"><label>Days of Effort</label><input class="field-input" type="number" id="fEffort" min="1" step="1" value="'+effortDays+'" /></div>'+
+    '</div>'+
+    '<div class="field-group"><label>Projected Finish</label><input class="field-input" type="text" value="'+escHtml(fmtDate(projectedFinish))+'" readonly /></div>'+
+    '<div class="field-group"><label>Phase</label><select class="field-input" id="fPhase">'+
+      '<option value="1"'+(t.phase===1?' selected':'')+'>Phase 1 &mdash; POC</option>'+
+      '<option value="2"'+(t.phase===2?' selected':'')+'>Phase 2 &mdash; Production</option>'+
+    '</select></div>'+
+    '<div class="checkbox-row"><input type="checkbox" id="fDone"'+(t.done?' checked':'')+' /><label for="fDone">Mark complete (100%)</label></div>'+
+    '<div class="checkbox-row"><input type="checkbox" id="fTbd"'+(t.tbd?' checked':'')+' /><label for="fTbd">Estimate TBD</label></div>'+
+    '<div class="field-group"><label>Note</label><textarea class="field-input" id="fNote">'+escHtml(t.note||'')+'</textarea></div>'+
+    '<div class="sec-title" style="margin-top:11px">Depends On — must finish before this starts <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(click &#x2715; to remove)</span></div>'+
+    '<div class="dep-chips" id="depChips">'+depChipsHtml+'</div>'+
+    '<div class="dep-add-row">'+
+      '<select class="field-input" id="depAddSelect"><option value="">— add dependency —</option>'+addOpts+'</select>'+
+      '<button class="btn" id="btnDepAdd">Add</button>'+
+    '</div>'+
+    '<div class="dep-warn'+(conflicts.length?' visible':'')+'" id="depWarn">&#9888; Starts before: '+conflicts.map(escHtml).join(', ')+'</div>'+
+    '<div class="sec-title" style="margin-top:11px">Blocks these tasks <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(click &#x2715; to disconnect)</span></div>'+
+    '<div class="blocking-list">'+blockedHtml+'</div>'+
+    '<div class="task-actions" style="margin-top:13px"><button class="btn btn-danger" id="btnDeleteTask">&#x1F5D1; Delete Task</button></div>';
+
+  function save(){
+    var nv=document.getElementById('fName').value.trim(); t.name=nv||t.name;
+    t.assignee=document.getElementById('fAssignee').value.trim();
+    t.phase=parseInt(document.getElementById('fPhase').value);
+    t.done=document.getElementById('fDone').checked;
+    t.tbd=document.getElementById('fTbd').checked;
+    t.note=document.getElementById('fNote').value.trim();
+    t.custom_class=phaseClass(t); if(t.done)t.progress=100;
+    renderGantt(); showDetail(id);
+  }
+  ['fName','fAssignee','fPhase','fNote'].forEach(function(fid){document.getElementById(fid).addEventListener('change',save);});
+  ['fDone','fTbd'].forEach(function(fid){document.getElementById(fid).addEventListener('change',save);});
+
+  document.getElementById('fStart').addEventListener('change',function(e){
+    var ns=e.target.value; if(!ns)return;
+    var m=taskMap(),tx=m[id],nextStart=excludeWeekends ? nextWorkday(ns) : ns,
+        d=excludeWeekends ? workdayDelta(tx.start,nextStart) : daysBetween(tx.start,nextStart);
+    tx.start=nextStart;
+    if(d!==0)cascade(id,d,buildRevDeps(),m);
+    renderGantt(); showDetail(id);
+  });
+  document.getElementById('fEffort').addEventListener('change',function(e){
+    taskMap()[id].daysOfEffort=clampEffortDays(e.target.value);
+    renderGantt(); showDetail(id);
+  });
+  // ── Delete dependency links ──
+  detail.querySelectorAll('.chip-x').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var m=taskMap(),tx=m[id]; setDeps(tx,getDeps(tx).filter(function(d){return d!==btn.dataset.remove;}));
+      renderGantt(); showDetail(id);
+    });
+  });
+  document.getElementById('btnDepAdd').addEventListener('click',function(){
+    var sel=document.getElementById('depAddSelect').value; if(!sel)return;
+    var m=taskMap(),tx=m[id],ex=getDeps(tx);
+    if(!ex.includes(sel)){ex.push(sel);setDeps(tx,ex);renderGantt();showDetail(id);}
+  });
+  detail.querySelectorAll('.bl-rm').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var m=taskMap(),down=m[btn.dataset.unblock]; if(!down)return;
+      setDeps(down,getDeps(down).filter(function(d){return d!==id;}));
+      renderGantt(); showDetail(id);
+    });
+  });
+  // ── Delete task ──
+  document.getElementById('btnDeleteTask').addEventListener('click',function(){
+    if(!confirm('Delete "'+t.name+'"?\nAlso removes it from all dependency lists.'))return;
+    tasks.forEach(function(x){if(getDeps(x).includes(id))setDeps(x,getDeps(x).filter(function(d){return d!==id;}));});
+    tasks=tasks.filter(function(x){return x.id!==id;});
+    clearSelectionUI();
+    renderGantt();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  STATS
+// ─────────────────────────────────────────────────────────────────
+function updateStats(){
+  var total=tasks.length,done=tasks.filter(function(t){return t.done;}).length,
+      tbd=tasks.filter(function(t){return t.tbd&&!t.done;}).length,
+      lastEnd=tasks.map(function(t){return taskEndDate(t);}).sort().slice(-1)[0];
+  document.getElementById('statsRow').innerHTML=
+    '<div class="stat-chip"><strong>'+total+'</strong> tasks</div>'+
+    '<div class="stat-chip"><strong>'+done+'</strong> complete</div>'+
+    '<div class="stat-chip"><strong>'+tbd+'</strong> TBD</div>'+
+    '<div class="stat-chip">Ships <strong>'+fmtDate(lastEnd)+'</strong></div>';
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  ADD TASK MODAL
+// ─────────────────────────────────────────────────────────────────
+function openModal(){
+  var today=toISO(new Date());
+  document.getElementById('mName').value=''; document.getElementById('mAssignee').value='';
+  document.getElementById('mStart').value=today; document.getElementById('mEffort').value='14';
+  document.getElementById('mPhase').value='1'; document.getElementById('mTbd').checked=false;
+  document.getElementById('mNote').value=''; document.getElementById('mError').style.display='none';
+  document.getElementById('modalBackdrop').classList.add('open');
+  setTimeout(function(){document.getElementById('mName').focus();},50);
+}
+function closeModal(){ document.getElementById('modalBackdrop').classList.remove('open'); }
+document.getElementById('btnAddTask').addEventListener('click',openModal);
+document.getElementById('btnModalCancel').addEventListener('click',closeModal);
+document.getElementById('modalBackdrop').addEventListener('click',function(e){ if(e.target===document.getElementById('modalBackdrop'))closeModal(); });
+document.getElementById('btnModalAdd').addEventListener('click',function(){
+  var name=document.getElementById('mName').value.trim(),
+      start=document.getElementById('mStart').value,
+      effort=clampEffortDays(document.getElementById('mEffort').value),
+      err=document.getElementById('mError');
+  if(!name){err.textContent='Task name is required.';err.style.display='block';return;}
+  if(!start){err.textContent='Start date is required.';err.style.display='block';return;}
+  if(effort < 1){err.textContent='Days of effort must be at least 1.';err.style.display='block';return;}
+  var phase=parseInt(document.getElementById('mPhase').value),tbd=document.getElementById('mTbd').checked,
+      note=document.getElementById('mNote').value.trim(),
+      assignee=document.getElementById('mAssignee').value.trim()||'Unassigned';
+  var nt={id:slugify(name),name:name,start:start,daysOfEffort:effort,progress:0,dependencies:'',
+          assignee:assignee,phase:phase,done:false,tbd:tbd,note:note,
+          custom_class:tbd?'bar-tbd':phase===1?'bar-poc':'bar-prod'};
+  tasks.push(nt); closeModal(); renderGantt(); showDetail(nt.id);
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  THEME
+// ─────────────────────────────────────────────────────────────────
+function applyTheme(light){
+  if(light){ document.documentElement.classList.add('light'); document.getElementById('btnTheme').innerHTML='&#127769; Dark'; }
+  else      { document.documentElement.classList.remove('light'); document.getElementById('btnTheme').innerHTML='&#9728; Light'; }
+  try{localStorage.setItem('gantry-theme',light?'light':'dark');}catch(e){}
+}
+document.getElementById('btnTheme').addEventListener('click',function(){ applyTheme(!document.documentElement.classList.contains('light')); });
+
+// ─────────────────────────────────────────────────────────────────
+//  SAVE / LOAD JSON
+// ─────────────────────────────────────────────────────────────────
+document.getElementById('btnSave').addEventListener('click',function(){
+  var data=JSON.stringify({
+    version:2,
+    savedAt:new Date().toISOString(),
+    title:document.getElementById('appTitle').textContent,
+    tasks:tasks.map(serialiseTask)
+  },null,2);
+  var blob=new Blob([data],{type:'application/json'});
+  var url=URL.createObjectURL(blob),a=document.createElement('a');
+  var slug=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  a.href=url; a.download=slug+'-'+toISO(new Date())+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+});
+document.getElementById('btnLoad').addEventListener('click',function(){ document.getElementById('fileInput').value=''; document.getElementById('fileInput').click(); });
+document.getElementById('fileInput').addEventListener('change',function(e){
+  var file=e.target.files[0]; if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var data=JSON.parse(ev.target.result);
+      var loaded=Array.isArray(data)?data:(data.tasks||null);
+      if(!Array.isArray(loaded)||!loaded.length){alert('Invalid file: no tasks array found.');return;}
+      if(!Array.isArray(data)&&data.title){
+        document.getElementById('appTitle').textContent=data.title;
+        document.title=data.title+' — Gantry';
+      }
+      DEFAULTS=loaded.map(function(t){return normalise(deepClone(t));});
+      tasks=deepClone(DEFAULTS);
+      selectedId=null; exitLinkMode();
+      document.getElementById('taskDetail').className=''; document.getElementById('hint').style.display='';
+      renderGantt();
+    }catch(err){alert('Failed to load: '+err.message);}
+  };
+  reader.readAsText(file);
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  EXPORT  PNG / PDF
+// ─────────────────────────────────────────────────────────────────
+function showToast(msg){
+  var s=document.getElementById('exportStatus');
+  s.textContent=msg; s.classList.add('visible');
+  setTimeout(function(){s.classList.remove('visible');},3000);
+}
+
+function captureChart(callback){
+  // Make gantt card full-width for the snapshot
+  var card=document.getElementById('ganttCard');
+  var prevWidth=card.style.minWidth;
+  card.style.minWidth='unset';
+  showToast('Rendering chart\u2026');
+  html2canvas(card,{
+    backgroundColor: document.documentElement.classList.contains('light') ? '#ffffff' : '#1c2128',
+    scale: 2,
+    useCORS: true,
+    logging: false
+  }).then(function(canvas){
+    card.style.minWidth=prevWidth;
+    callback(canvas);
+  }).catch(function(err){
+    card.style.minWidth=prevWidth;
+    alert('Export failed: '+err.message);
+  });
+}
+
+document.getElementById('btnExportPng').addEventListener('click',function(){
+  captureChart(function(canvas){
+    var link=document.createElement('a');
+    var slug2=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    link.download=slug2+'-'+toISO(new Date())+'.png';
+    link.href=canvas.toDataURL('image/png');
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showToast('PNG saved!');
+  });
+});
+
+document.getElementById('btnExportPdf').addEventListener('click',function(){
+  captureChart(function(canvas){
+    var jsPDF=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
+    var imgData=canvas.toDataURL('image/png');
+    // Fit on landscape A4 with margins
+    var pageW=297,pageH=210,margin=10;
+    var areaW=pageW-margin*2,areaH=pageH-margin*2;
+    var ratio=canvas.width/canvas.height;
+    var w=areaW,h=areaW/ratio;
+    if(h>areaH){h=areaH;w=areaH*ratio;}
+    var x=margin+(areaW-w)/2,y=margin+(areaH-h)/2;
+    var doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    doc.addImage(imgData,'PNG',x,y,w,h);
+    var slug3=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    doc.save(slug3+'-'+toISO(new Date())+'.pdf');
+    showToast('PDF saved!');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  EXCLUDE WEEKENDS / HOLIDAYS TOGGLE
+// ─────────────────────────────────────────────────────────────────
+// Count workdays (Mon-Fri, non-holiday) between two ISO dates (start inclusive, end exclusive)
+function countWorkdays(start, end) {
+  var d = parseLocal(start), e = parseLocal(end), n = 0;
+  while(d < e) {
+    var dow = d.getDay(), iso = toISO(d);
+    if(dow !== 0 && dow !== 6 && !(excludeHolidays && holidaySet.has(iso))) n++;
+    d.setDate(d.getDate() + 1);
+  }
+  return n;
+}
+
+function applyExcludeWeekends(on) {
+  excludeWeekends = on;
+  var btn = document.getElementById('btnWeekends');
+  if(on) { btn.classList.add('active'); btn.style.borderColor='var(--accent)'; btn.style.color='var(--accent)'; }
+  else   { btn.classList.remove('active'); btn.style.borderColor=''; btn.style.color=''; }
+  try{ localStorage.setItem('gantry-excl-weekends', on?'1':'0'); }catch(e){}
+  renderGantt();
+  if(selectedId) showDetail(selectedId);
+}
+
+function applyExcludeHolidays(on) {
+  excludeHolidays = on;
+  var btn = document.getElementById('btnLoadHolidays');
+  if(on) {
+    btn.classList.add('active'); btn.style.borderColor='var(--accent)'; btn.style.color='var(--accent)';
+    btn.textContent = '\uD83C\uDFDB\uFE0F ' + loadedHolidayName + ' \u25CF';
+    btn.title = 'Holidays ON (' + holidaySet.size + ' days) — click to disable';
+  } else {
+    btn.classList.remove('active'); btn.style.borderColor=''; btn.style.color='';
+    if(holidaySet.size > 0) {
+      btn.textContent = '\uD83C\uDFDB\uFE0F ' + loadedHolidayName + ' (off)';
+      btn.title = 'Holidays OFF — click to re-enable, or load a new file';
+    } else {
+      btn.textContent = '\uD83C\uDFDB\uFE0F Load Holidays';
+      btn.title = 'Load a holidays JSON file to enable holiday exclusion';
+    }
+  }
+  renderGantt();
+}
+document.getElementById('btnWeekends').addEventListener('click', function(){
+  applyExcludeWeekends(!excludeWeekends);
+});
+
+// Holiday button: if holidays loaded → toggle on/off; if none loaded → open file picker
+document.getElementById('btnLoadHolidays').addEventListener('click', function(){
+  if(holidaySet.size > 0) {
+    applyExcludeHolidays(!excludeHolidays);
+  } else {
+    document.getElementById('holidayFileInput').value='';
+    document.getElementById('holidayFileInput').click();
+  }
+});
+document.getElementById('holidayFileInput').addEventListener('change', function(e){
+  var file=e.target.files[0]; if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var data=JSON.parse(ev.target.result);
+      var arr=Array.isArray(data)?data:(data.holidays||null);
+      if(!Array.isArray(arr)){alert('Invalid holidays file: expected array or {holidays:[...]}'); return;}
+      holidaySet = new Set(arr.map(function(h){return (h.date||h).slice(0,10);}));
+      loadedHolidayName = data.name || file.name;
+      // If exclude-weekends is on, re-render so new holidays are factored into display dates
+      applyExcludeHolidays(true);
+    }catch(err){alert('Failed to load holidays: '+err.message);}
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('viewGroup').addEventListener('click',function(e){
+  var btn=e.target.closest('[data-view]'); if(!btn)return;
+  document.querySelectorAll('.view-group button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active'); renderGantt(); if(selectedId) showDetail(selectedId);
+});
+document.getElementById('btnLinkMode').addEventListener('click',function(){ linkMode?exitLinkMode():enterLinkMode(); });
+document.getElementById('btnCancelLink').addEventListener('click',exitLinkMode);
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){exitLinkMode();closeModal();return;}
+  if(isTextEditingTarget(document.activeElement)) return;
+  if(!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  var key = (e.key || '').toLowerCase();
+  if(key === 'c') {
+    if(copySelectionToClipboard()) e.preventDefault();
+    return;
+  }
+  if(key === 'v') {
+    if(pasteClipboardAtHover()) e.preventDefault();
+  }
+});
+document.getElementById('btnReset').addEventListener('click',function(){
+  if(!confirm('Reset all tasks to the last loaded state?'))return;
+  tasks=deepClone(DEFAULTS); selectedId=null; exitLinkMode();
+  timelineScrollLeft=null; userAdjustedTimelineZoom=false; shouldApplyDefaultViewport=true;
+  document.getElementById('taskDetail').className=''; document.getElementById('hint').style.display='';
+  renderGantt();
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  HEADER CONTROLS
+// ─────────────────────────────────────────────────────────────────
+document.getElementById('zoomRowIn' ).addEventListener('click', function(){
+  BAR_HEIGHT = Math.min(BAR_HEIGHT + BAR_STEP, BAR_MAX); renderGantt(); if(selectedId) showDetail(selectedId);
+});
+document.getElementById('zoomRowOut').addEventListener('click', function(){
+  BAR_HEIGHT = Math.max(BAR_HEIGHT - BAR_STEP, BAR_MIN); renderGantt(); if(selectedId) showDetail(selectedId);
+});
+document.getElementById('zoomColIn' ).addEventListener('click', function(){
+  userAdjustedTimelineZoom=true;
+  COL_WIDTH = Math.min(COL_WIDTH + COL_STEP, COL_MAX); renderGantt(); if(selectedId) showDetail(selectedId);
+});
+document.getElementById('zoomColOut').addEventListener('click', function(){
+  userAdjustedTimelineZoom=true;
+  COL_WIDTH = Math.max(COL_WIDTH - COL_STEP, COL_MIN); renderGantt(); if(selectedId) showDetail(selectedId);
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────────────────────────
+try{ applyTheme(localStorage.getItem('gantry-theme')==='light'); }catch(e){ applyTheme(false); }
+try{ if(localStorage.getItem('gantry-excl-weekends')==='1') applyExcludeWeekends(true); }catch(e){}
+renderGantt();
+</script>
+</body>
+</html>
