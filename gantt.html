@@ -525,7 +525,7 @@
     <div class="sidebar-inner">
       <div class="sidebar-tabs" id="sidebarTabs">
         <button class="sidebar-tab active" data-sidebar-tab="task">Task</button>
-        <button class="sidebar-tab" data-sidebar-tab="phases">Phases</button>
+        <button class="sidebar-tab" data-sidebar-tab="phases">Global</button>
       </div>
 
       <div class="sidebar-panel active" id="taskPanel">
@@ -552,9 +552,11 @@
         </div>
         <div id="phaseManager"></div>
 
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 8px" />
         <div class="sec-title">Legend</div>
         <div class="legend" id="legend"></div>
 
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 8px" />
         <div class="sec-title">Timeline Markers</div>
         <div id="markerManager"></div>
       </div>
@@ -1831,12 +1833,17 @@ function drawMarkers(svg) {
     markerGroup.appendChild(label);
   });
 
-  // Insert above bars so lines sit behind task bars but above grid/shading
-  var barLayer = svg.querySelector('.bar-wrapper');
-  if(barLayer) {
-    svg.insertBefore(markerGroup, barLayer);
+  // Insert after grid layer (same as weekend shading) — above shading, below bars
+  var weekendLayer = svg.querySelector('.weekend-shade');
+  if(weekendLayer && weekendLayer.nextSibling) {
+    svg.insertBefore(markerGroup, weekendLayer.nextSibling);
   } else {
-    svg.appendChild(markerGroup);
+    var gridLayer = svg.querySelector('g.grid');
+    if(gridLayer && gridLayer.nextSibling) {
+      svg.insertBefore(markerGroup, gridLayer.nextSibling);
+    } else {
+      svg.appendChild(markerGroup);
+    }
   }
 }
 

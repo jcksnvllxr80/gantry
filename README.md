@@ -109,7 +109,7 @@ Older data with `start` and `end` still loads, but the app saves tasks back as `
 Markers are labeled vertical lines drawn on the chart — useful for deadlines,
 milestones, or tracking today's date.
 
-- Manage markers in the **Phases** sidebar tab under **Timeline Markers**
+- Manage markers in the **Global** sidebar tab under **Timeline Markers**
 - Each marker has a label, date, and color
 - A **Today** marker is included by default and auto-updates its date
 - Click **+ Add Marker** to create a new marker (defaults to one week out)
