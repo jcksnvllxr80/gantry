@@ -1,13 +1,39 @@
 {
   "version": 2,
-  "savedAt": "2026-04-03T01:00:52.651Z",
+  "savedAt": "2026-04-03T04:30:37.834Z",
   "title": "Gantry Demo - Moonbase Snack Ops",
+  "settings": {
+    "viewMode": "Week",
+    "colWidth": 120,
+    "barHeight": 54,
+    "theme": "dark"
+  },
   "phases": [
-    { "id": "discovery", "name": "Discovery", "color": "#B35C00" },
-    { "id": "poc", "name": "POC", "color": "#2DA44E" },
-    { "id": "pilot", "name": "Pilot", "color": "#8250DF" },
-    { "id": "production", "name": "Production", "color": "#0969DA" },
-    { "id": "maintenance", "name": "Maintenance", "color": "#6E7781" }
+    {
+      "id": "discovery",
+      "name": "Discovery",
+      "color": "#B35C00"
+    },
+    {
+      "id": "poc",
+      "name": "POC",
+      "color": "#2DA44E"
+    },
+    {
+      "id": "pilot",
+      "name": "Pilot",
+      "color": "#8250DF"
+    },
+    {
+      "id": "production",
+      "name": "Production",
+      "color": "#0969DA"
+    },
+    {
+      "id": "maintenance",
+      "name": "Maintenance",
+      "color": "#6E7781"
+    }
   ],
   "tasks": [
     {
@@ -100,6 +126,15 @@
       "done": false,
       "tbd": true,
       "note": "Candidates remain classified until legal clears the pickle glitter."
+    }
+  ],
+  "markers": [
+    {
+      "id": "marker-today",
+      "label": "Today",
+      "date": "2026-04-03",
+      "color": "#58a6ff",
+      "isToday": true
     }
   ]
 }

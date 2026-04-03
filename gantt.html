@@ -302,9 +302,14 @@
 
     /* SIDEBAR */
     .sidebar {
-      width: 280px; min-width: 280px; background: var(--surface);
+      width: 280px; min-width: 180px; max-width: 50vw; background: var(--surface);
       border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;
     }
+    .sidebar-resize {
+      width: 5px; cursor: col-resize; background: transparent; flex: none;
+      position: relative; z-index: 10;
+    }
+    .sidebar-resize:hover, .sidebar-resize.active { background: var(--accent); opacity: 0.4; }
     .sidebar-tabs { display: flex; margin: -13px -13px 13px; border-bottom: 1px solid var(--border); }
     .sidebar-tab {
       flex: 1; border: none; border-right: 1px solid var(--border);
@@ -536,7 +541,8 @@
     <div id="reorderOverlay"><div id="reorderLine"></div><div id="reorderGhost"></div><div id="selectionBox"></div></div>
   </div>
 
-  <aside class="sidebar">
+  <div class="sidebar-resize" id="sidebarResize"></div>
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-inner">
       <div class="sidebar-tabs" id="sidebarTabs">
         <button class="sidebar-tab active" data-sidebar-tab="task">Task</button>
@@ -2467,6 +2473,41 @@ document.getElementById('sidebarTabs').addEventListener('click', function(e){
 });
 document.getElementById('btnLinkMode').addEventListener('click',function(){ linkMode?exitLinkMode():enterLinkMode(); });
 document.getElementById('btnCancelLink').addEventListener('click',exitLinkMode);
+
+// ── Sidebar resize ──────────────────────────────────────────────
+(function(){
+  var handle = document.getElementById('sidebarResize');
+  var sidebar = document.getElementById('sidebar');
+  var startX, startW;
+  handle.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    startX = e.clientX;
+    startW = sidebar.offsetWidth;
+    handle.classList.add('active');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  function onMove(e){
+    var newW = startW - (e.clientX - startX);
+    newW = Math.max(180, Math.min(window.innerWidth * 0.5, newW));
+    sidebar.style.width = newW + 'px';
+    sidebar.style.minWidth = newW + 'px';
+  }
+  function onUp(){
+    handle.classList.remove('active');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    try{ localStorage.setItem('gantry-sidebar-width', sidebar.offsetWidth); }catch(e){}
+  }
+  try{
+    var saved = parseInt(localStorage.getItem('gantry-sidebar-width'), 10);
+    if(saved && saved >= 180) { sidebar.style.width = saved + 'px'; sidebar.style.minWidth = saved + 'px'; }
+  }catch(e){}
+})();
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){exitLinkMode();closeModal();return;}
   if(isTextEditingTarget(document.activeElement)) return;
