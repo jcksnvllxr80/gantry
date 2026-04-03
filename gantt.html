@@ -49,6 +49,38 @@
     .view-group button:hover  { background: var(--border); color: var(--text); }
     .view-group button.active { background: var(--accent); color: #fff; font-weight: 600; }
 
+    /* MENU BAR */
+    .menu-bar {
+      display: flex; gap: 2px; align-items: center; flex-shrink: 0;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 2px 10px;
+    }
+    .menu-item { position: relative; }
+    .menu-trigger {
+      background: transparent; border: none; color: var(--text); padding: 5px 10px;
+      font-size: 12px; font-weight: 500; cursor: pointer; border-radius: 4px;
+      transition: background .12s;
+    }
+    .menu-trigger:hover, .menu-item.open .menu-trigger { background: var(--surface2); }
+    .menu-dropdown {
+      display: none; position: absolute; top: 100%; left: 0; z-index: 50;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.35); min-width: 190px; padding: 4px 0;
+      margin-top: 2px;
+    }
+    .menu-item.open .menu-dropdown { display: block; }
+    .menu-action {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; background: transparent; border: none; color: var(--text);
+      padding: 6px 14px; font-size: 12px; cursor: pointer; text-align: left;
+      transition: background .1s;
+    }
+    .menu-action:hover { background: var(--surface2); }
+    .menu-action[disabled] { color: var(--muted); cursor: default; }
+    .menu-action[disabled]:hover { background: transparent; }
+    .menu-shortcut { color: var(--muted); font-size: 11px; margin-left: 18px; }
+    .menu-sep { border-top: 1px solid var(--border); margin: 4px 0; }
+
     .btn {
       background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
       color: var(--muted); padding: 5px 11px; font-size: 12px; cursor: pointer;
@@ -414,6 +446,34 @@
 </head>
 <body>
 
+<nav class="menu-bar">
+  <div class="menu-item" id="menuFile">
+    <button class="menu-trigger">File</button>
+    <div class="menu-dropdown">
+      <button class="menu-action" data-action="save">Save JSON</button>
+      <button class="menu-action" data-action="load">Load JSON</button>
+      <div class="menu-sep"></div>
+      <button class="menu-action" data-action="savePhases">Save Phases</button>
+      <button class="menu-action" data-action="loadPhases">Load Phases</button>
+      <button class="menu-action" data-action="loadHolidays">Load Holidays</button>
+      <div class="menu-sep"></div>
+      <button class="menu-action" data-action="exportPng">Export PNG</button>
+      <button class="menu-action" data-action="exportPdf">Export PDF</button>
+      <div class="menu-sep"></div>
+      <button class="menu-action" data-action="reset">Reset</button>
+    </div>
+  </div>
+  <div class="menu-item" id="menuEdit">
+    <button class="menu-trigger">Edit</button>
+    <div class="menu-dropdown">
+      <button class="menu-action" data-action="undo" id="menuUndo">Undo <span class="menu-shortcut">Ctrl+Z</span></button>
+      <button class="menu-action" data-action="redo" id="menuRedo">Redo <span class="menu-shortcut">Ctrl+Y</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-action" data-action="copy">Copy <span class="menu-shortcut">Ctrl+C</span></button>
+      <button class="menu-action" data-action="paste">Paste <span class="menu-shortcut">Ctrl+V</span></button>
+    </div>
+  </div>
+</nav>
 <header>
   <div class="hdr-title">
     <h1 id="appTitle">Gantry</h1>
@@ -806,6 +866,7 @@ function renderPhaseManager() {
     input.addEventListener('change', function(){
       var phase = phaseById(input.dataset.phaseName);
       if(!phase) return;
+      pushUndo();
       var nextName = input.value.trim();
       phase.name = nextName || phase.name;
       syncPhaseUI(false);
@@ -816,6 +877,7 @@ function renderPhaseManager() {
     input.addEventListener('input', function(){
       var phase = phaseById(input.dataset.phaseColor);
       if(!phase) return;
+      pushUndoDebounced();
       phase.color = normaliseHexColor(input.value, phase.color);
       syncPhaseUI(false);
       if(selectedId && activeSidebarTab === 'task') showDetail(selectedId);
@@ -827,6 +889,7 @@ function renderPhaseManager() {
     });
   });
   document.getElementById('btnAddPhase').addEventListener('click', function(){
+    pushUndo();
     phases.push({
       id: createPhaseId('phase'),
       name: 'New Phase',
@@ -863,6 +926,7 @@ function renderMarkerManager() {
     input.addEventListener('input', function(){
       var m = markerById(input.dataset.markerColor);
       if(!m) return;
+      pushUndoDebounced();
       m.color = input.value;
       renderMarkerManager();
       renderGantt();
@@ -872,6 +936,7 @@ function renderMarkerManager() {
     input.addEventListener('change', function(){
       var m = markerById(input.dataset.markerLabel);
       if(!m) return;
+      pushUndo();
       m.label = input.value.trim() || m.label;
       renderGantt();
     });
@@ -880,18 +945,21 @@ function renderMarkerManager() {
     input.addEventListener('change', function(){
       var m = markerById(input.dataset.markerDate);
       if(!m || m.isToday) return;
+      pushUndo();
       m.date = input.value;
       renderGantt();
     });
   });
   host.querySelectorAll('[data-marker-delete]').forEach(function(btn){
     btn.addEventListener('click', function(){
+      pushUndo();
       markers = markers.filter(function(m){ return m.id !== btn.dataset.markerDelete; });
       renderMarkerManager();
       renderGantt();
     });
   });
   document.getElementById('btnAddMarker').addEventListener('click', function(){
+    pushUndo();
     var nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
     markers.push({
@@ -937,6 +1005,7 @@ function deletePhase(phaseId) {
     return;
   }
   if(usage && !confirm('Delete "'+target.name+'"? '+usage+' task'+(usage===1?'':'s')+' will move to '+remaining[0].name+'.')) return;
+  pushUndo();
   phases = remaining;
   if(usage) {
     tasks.forEach(function(task){
@@ -957,6 +1026,7 @@ function parseConfigPayload(data) {
   };
 }
 function applyLoadedConfig(data, options) {
+  clearUndoHistory();
   var parsed = parseConfigPayload(data);
   var nextPhases = buildPhaseList(parsed.phases, parsed.tasks);
   var nextTasks = parsed.tasks.map(function(task){ return normalise(deepClone(task)); });
@@ -1042,6 +1112,79 @@ var suppressBarClick = false;
 var taskClipboard = null;
 var hoverPasteTarget = null;
 var pendingDateChangeIgnoreIds = new Set();
+
+// ─────────────────────────────────────────────────────────────────
+//  UNDO / REDO
+// ─────────────────────────────────────────────────────────────────
+var undoStack = [];
+var redoStack = [];
+var UNDO_LIMIT = 50;
+var lastUndoPushTime = 0;
+
+function captureState() {
+  return {
+    tasks: deepClone(tasks),
+    phases: deepClone(phases),
+    markers: deepClone(markers),
+    selectedId: selectedId,
+    selectedIds: selectedIds.slice(),
+    selectionAnchorId: selectionAnchorId,
+    excludeWeekends: excludeWeekends,
+    excludeHolidays: excludeHolidays
+  };
+}
+function pushUndo() {
+  undoStack.push(captureState());
+  if(undoStack.length > UNDO_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+  updateUndoMenuState();
+}
+function pushUndoDebounced(ms) {
+  var now = Date.now();
+  if(now - lastUndoPushTime < (ms || 300)) return;
+  lastUndoPushTime = now;
+  pushUndo();
+}
+function restoreState(snap) {
+  tasks = snap.tasks;
+  phases = snap.phases;
+  markers = snap.markers;
+  selectedId = snap.selectedId;
+  selectedIds = snap.selectedIds;
+  selectionAnchorId = snap.selectionAnchorId;
+  excludeWeekends = snap.excludeWeekends;
+  excludeHolidays = snap.excludeHolidays;
+  // Sync toggle button states
+  var wBtn = document.getElementById('btnWeekends');
+  if(excludeWeekends) { wBtn.classList.add('active'); wBtn.style.borderColor='var(--accent)'; wBtn.style.color='var(--accent)'; }
+  else { wBtn.classList.remove('active'); wBtn.style.borderColor=''; wBtn.style.color=''; }
+  syncPhaseUI(false);
+  renderGantt();
+  if(selectedId && tasks.find(function(t){ return t.id===selectedId; })) showDetail(selectedId);
+  else { document.getElementById('taskDetail').className=''; document.getElementById('taskDetail').innerHTML=''; document.getElementById('hint').style.display=''; }
+  updateUndoMenuState();
+}
+function undo() {
+  if(!undoStack.length) return;
+  redoStack.push(captureState());
+  restoreState(undoStack.pop());
+}
+function redo() {
+  if(!redoStack.length) return;
+  undoStack.push(captureState());
+  restoreState(redoStack.pop());
+}
+function clearUndoHistory() {
+  undoStack.length = 0;
+  redoStack.length = 0;
+  updateUndoMenuState();
+}
+function updateUndoMenuState() {
+  var u = document.getElementById('menuUndo');
+  var r = document.getElementById('menuRedo');
+  if(u) u.disabled = !undoStack.length;
+  if(r) r.disabled = !redoStack.length;
+}
 
 // ─────────────────────────────────────────────────────────────────
 //  RENDER
@@ -1232,6 +1375,7 @@ function pasteClipboardAtHover() {
     setDeps(clone, originalDeps.map(function(depId){ return idMap[depId] || depId; }));
   });
 
+  pushUndo();
   tasks.splice.apply(tasks, [insertIndex, 0].concat(newTasks));
   updateSelection(newTasks.map(function(task){ return task.id; }), newTasks[0].id);
   return true;
@@ -1326,6 +1470,7 @@ function renderGantt() {
         return;
       }
       var tMap2=taskMap(),t=tMap2[task.id]; if(!t)return;
+      pushUndo();
       var rawStart=toISO(start), rawEnd=toISO(end), rawFinish=shiftDate(rawEnd, -1);
       var oldStart=t.start, oldEffort=getTaskEffortDays(t);
       var isMove=activeDateChangeMode==='move' && activeDateChangeTaskId===task.id;
@@ -1352,7 +1497,7 @@ function renderGantt() {
     on_progress_change:function(task,progress){
       var p=Math.round(progress/5)*5;
       var m=taskMap(),t=m[task.id];
-      if(t){t.progress=p;if(p>=100)t.done=true;if(selectedId===task.id)showDetail(task.id);}
+      if(t){pushUndoDebounced();t.progress=p;if(p>=100)t.done=true;if(selectedId===task.id)showDetail(task.id);}
     },on_view_change:function(){}
   });
 
@@ -1543,6 +1688,7 @@ function renderGantt() {
             if(src===-1) return;
             var ins=rdIdx>src ? rdIdx-1 : rdIdx;
             if(ins===src) return;
+            pushUndo();
             var tt=tasks.splice(src,1)[0];
             tasks.splice(ins,0,tt);
             renderGantt();
@@ -1730,7 +1876,7 @@ function handleBarClick(id, evt){
     }
     var tMap2=taskMap(),downstream=tMap2[id]; if(!downstream){exitLinkMode();return;}
     var ex=getDeps(downstream);
-    if(!ex.includes(linkSource)){ex.push(linkSource);setDeps(downstream,ex);}
+    if(!ex.includes(linkSource)){pushUndo();ex.push(linkSource);setDeps(downstream,ex);}
     exitLinkMode(); renderGantt(); showDetail(id);
     return;
   }
@@ -1769,6 +1915,7 @@ function showMultiDetail(id, chosen) {
     '<div class="selection-actions"><button class="btn" id="btnClearSelection">Clear Selection</button><button class="btn btn-danger" id="btnDeleteSelection">Delete Selected</button></div>';
 
   function batchSaveMeta(){
+    pushUndo();
     var assignee=document.getElementById('mfAssignee').value.trim();
     var phase=document.getElementById('mfPhase').value;
     var done=document.getElementById('mfDone').checked;
@@ -1792,6 +1939,7 @@ function showMultiDetail(id, chosen) {
     var nextStart=excludeWeekends ? nextWorkday(ns) : ns;
     var delta=excludeWeekends ? workdayDelta(primary.start,nextStart) : daysBetween(primary.start,nextStart);
     if(delta===0) return;
+    pushUndo();
     var tMap2=taskMap(), rev=buildRevDeps(), skipSet=new Set(selectedIds), vis=new Set();
     chosen.forEach(function(task){ task.start = excludeWeekends ? shiftWorkdays(task.start, delta) : shiftDate(task.start, delta); });
     chosen.forEach(function(task){ cascade(task.id, delta, rev, tMap2, vis, skipSet); });
@@ -1800,12 +1948,14 @@ function showMultiDetail(id, chosen) {
   document.getElementById('mfEffort').addEventListener('change',function(e){
     var nextEffort=clampEffortDays(e.target.value);
     var delta=nextEffort-getTaskEffortDays(primary);
+    pushUndo();
     chosen.forEach(function(task){ task.daysOfEffort=clampEffortDays(getTaskEffortDays(task)+delta); });
     renderGantt(); showDetail(id);
   });
   document.getElementById('btnClearSelection').addEventListener('click',function(){ clearSelectionUI(); renderGantt(); });
   document.getElementById('btnDeleteSelection').addEventListener('click',function(){
     if(!confirm('Delete '+chosen.length+' selected tasks?\nAlso removes them from all dependency lists.'))return;
+    pushUndo();
     var removeSet=new Set(selectedIds);
     tasks.forEach(function(task){ setDeps(task, getDeps(task).filter(function(dep){ return !removeSet.has(dep); })); });
     tasks=tasks.filter(function(task){ return !removeSet.has(task.id); });
@@ -1875,6 +2025,7 @@ function showDetail(id) {
     '<div class="task-actions" style="margin-top:13px"><button class="btn btn-danger" id="btnDeleteTask">&#x1F5D1; Delete Task</button></div>';
 
   function save(){
+    pushUndo();
     var nv=document.getElementById('fName').value.trim(); t.name=nv||t.name;
     t.assignee=document.getElementById('fAssignee').value.trim();
     t.phase=document.getElementById('fPhase').value;
@@ -1887,6 +2038,7 @@ function showDetail(id) {
   ['fName','fAssignee','fPhase','fNote'].forEach(function(fid){document.getElementById(fid).addEventListener('change',save);});
   ['fDone','fTbd'].forEach(function(fid){document.getElementById(fid).addEventListener('change',save);});
   document.getElementById('fProgress').addEventListener('input',function(e){
+    pushUndoDebounced();
     var v=parseInt(e.target.value,10);
     document.getElementById('fProgressVal').textContent=v+'%';
     t.progress=v;
@@ -1897,6 +2049,7 @@ function showDetail(id) {
 
   document.getElementById('fStart').addEventListener('change',function(e){
     var ns=e.target.value; if(!ns)return;
+    pushUndo();
     var m=taskMap(),tx=m[id],nextStart=excludeWeekends ? nextWorkday(ns) : ns,
         d=excludeWeekends ? workdayDelta(tx.start,nextStart) : daysBetween(tx.start,nextStart);
     tx.start=nextStart;
@@ -1904,12 +2057,14 @@ function showDetail(id) {
     renderGantt(); showDetail(id);
   });
   document.getElementById('fEffort').addEventListener('change',function(e){
+    pushUndo();
     taskMap()[id].daysOfEffort=clampEffortDays(e.target.value);
     renderGantt(); showDetail(id);
   });
   // ── Delete dependency links ──
   detail.querySelectorAll('.chip-x').forEach(function(btn){
     btn.addEventListener('click',function(){
+      pushUndo();
       var m=taskMap(),tx=m[id]; setDeps(tx,getDeps(tx).filter(function(d){return d!==btn.dataset.remove;}));
       renderGantt(); showDetail(id);
     });
@@ -1917,11 +2072,12 @@ function showDetail(id) {
   document.getElementById('btnDepAdd').addEventListener('click',function(){
     var sel=document.getElementById('depAddSelect').value; if(!sel)return;
     var m=taskMap(),tx=m[id],ex=getDeps(tx);
-    if(!ex.includes(sel)){ex.push(sel);setDeps(tx,ex);renderGantt();showDetail(id);}
+    if(!ex.includes(sel)){pushUndo();ex.push(sel);setDeps(tx,ex);renderGantt();showDetail(id);}
   });
   detail.querySelectorAll('.bl-rm').forEach(function(btn){
     btn.addEventListener('click',function(){
       var m=taskMap(),down=m[btn.dataset.unblock]; if(!down)return;
+      pushUndo();
       setDeps(down,getDeps(down).filter(function(d){return d!==id;}));
       renderGantt(); showDetail(id);
     });
@@ -1929,6 +2085,7 @@ function showDetail(id) {
   // ── Delete task ──
   document.getElementById('btnDeleteTask').addEventListener('click',function(){
     if(!confirm('Delete "'+t.name+'"?\nAlso removes it from all dependency lists.'))return;
+    pushUndo();
     tasks.forEach(function(x){if(getDeps(x).includes(id))setDeps(x,getDeps(x).filter(function(d){return d!==id;}));});
     tasks=tasks.filter(function(x){return x.id!==id;});
     clearSelectionUI();
@@ -1984,6 +2141,7 @@ document.getElementById('btnModalAdd').addEventListener('click',function(){
   var nt={id:slugify(name),name:name,start:start,daysOfEffort:effort,progress:0,dependencies:'',
           assignee:assignee,phase:phase,done:false,tbd:tbd,note:note,
           custom_class:tbd?'bar-tbd':phaseCssClass(phase)};
+  pushUndo();
   tasks.push(nt); closeModal(); renderGantt(); showDetail(nt.id);
 });
 
@@ -2000,7 +2158,7 @@ document.getElementById('btnTheme').addEventListener('click',function(){ applyTh
 // ─────────────────────────────────────────────────────────────────
 //  SAVE / LOAD JSON
 // ─────────────────────────────────────────────────────────────────
-document.getElementById('btnSave').addEventListener('click',function(){
+function doSaveJson(){
   var slug=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
   downloadJsonFile(slug+'-'+toISO(new Date())+'.json', {
     version:2,
@@ -2010,8 +2168,8 @@ document.getElementById('btnSave').addEventListener('click',function(){
     tasks:tasks.map(serialiseTask),
     markers:markers.map(serialiseMarker)
   });
-});
-document.getElementById('btnLoad').addEventListener('click',function(){ document.getElementById('fileInput').value=''; document.getElementById('fileInput').click(); });
+}
+function doLoadJson(){ document.getElementById('fileInput').value=''; document.getElementById('fileInput').click(); }
 document.getElementById('fileInput').addEventListener('change',function(e){
   var file=e.target.files[0]; if(!file)return;
   var reader=new FileReader();
@@ -2025,7 +2183,7 @@ document.getElementById('fileInput').addEventListener('change',function(e){
   };
   reader.readAsText(file);
 });
-document.getElementById('btnSavePhases').addEventListener('click', function(){
+function doSavePhases(){
   if(!phases.length){ alert('No phases to save.'); return; }
   var slug=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
   downloadJsonFile(slug+'-phases-'+toISO(new Date())+'.json', {
@@ -2033,11 +2191,11 @@ document.getElementById('btnSavePhases').addEventListener('click', function(){
     name: (document.getElementById('appTitle').textContent || 'Gantry') + ' Phases',
     phases: phases.map(serialisePhase)
   });
-});
-document.getElementById('btnLoadPhases').addEventListener('click', function(){
+}
+function doLoadPhases(){
   document.getElementById('phaseFileInput').value='';
   document.getElementById('phaseFileInput').click();
-});
+}
 document.getElementById('phaseFileInput').addEventListener('change', function(e){
   var file=e.target.files[0]; if(!file)return;
   var reader=new FileReader();
@@ -2046,6 +2204,7 @@ document.getElementById('phaseFileInput').addEventListener('change', function(e)
       var data=JSON.parse(ev.target.result);
       var nextPhases = buildPhaseList(Array.isArray(data) ? data : data.phases, []);
       if(!nextPhases.length){alert('Invalid phase file: expected phases array.');return;}
+      clearUndoHistory();
       phases = nextPhases;
       syncTaskPhases(tasks);
       DEFAULT_PHASES = deepClone(phases);
@@ -2087,7 +2246,7 @@ function captureChart(callback){
   });
 }
 
-document.getElementById('btnExportPng').addEventListener('click',function(){
+function doExportPng(){
   captureChart(function(canvas){
     var link=document.createElement('a');
     var slug2=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -2096,9 +2255,9 @@ document.getElementById('btnExportPng').addEventListener('click',function(){
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
     showToast('PNG saved!');
   });
-});
+}
 
-document.getElementById('btnExportPdf').addEventListener('click',function(){
+function doExportPdf(){
   captureChart(function(canvas){
     var jsPDF=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
     var imgData=canvas.toDataURL('image/png');
@@ -2115,7 +2274,7 @@ document.getElementById('btnExportPdf').addEventListener('click',function(){
     doc.save(slug3+'-'+toISO(new Date())+'.pdf');
     showToast('PDF saved!');
   });
-});
+}
 
 // ─────────────────────────────────────────────────────────────────
 //  EXCLUDE WEEKENDS / HOLIDAYS TOGGLE
@@ -2132,6 +2291,7 @@ function countWorkdays(start, end) {
 }
 
 function applyExcludeWeekends(on) {
+  pushUndo();
   excludeWeekends = on;
   var btn = document.getElementById('btnWeekends');
   if(on) { btn.classList.add('active'); btn.style.borderColor='var(--accent)'; btn.style.color='var(--accent)'; }
@@ -2142,6 +2302,7 @@ function applyExcludeWeekends(on) {
 }
 
 function applyExcludeHolidays(on) {
+  pushUndo();
   excludeHolidays = on;
   var btn = document.getElementById('btnLoadHolidays');
   if(on) {
@@ -2165,14 +2326,15 @@ document.getElementById('btnWeekends').addEventListener('click', function(){
 });
 
 // Holiday button: if holidays loaded → toggle on/off; if none loaded → open file picker
-document.getElementById('btnLoadHolidays').addEventListener('click', function(){
+function doLoadHolidays(){
   if(holidaySet.size > 0) {
     applyExcludeHolidays(!excludeHolidays);
   } else {
     document.getElementById('holidayFileInput').value='';
     document.getElementById('holidayFileInput').click();
   }
-});
+}
+document.getElementById('btnLoadHolidays').addEventListener('click', doLoadHolidays);
 document.getElementById('holidayFileInput').addEventListener('change', function(e){
   var file=e.target.files[0]; if(!file)return;
   var reader=new FileReader();
@@ -2181,6 +2343,7 @@ document.getElementById('holidayFileInput').addEventListener('change', function(
       var data=JSON.parse(ev.target.result);
       var arr=Array.isArray(data)?data:(data.holidays||null);
       if(!Array.isArray(arr)){alert('Invalid holidays file: expected array or {holidays:[...]}'); return;}
+      clearUndoHistory();
       holidaySet = new Set(arr.map(function(h){return (h.date||h).slice(0,10);}));
       loadedHolidayName = data.name || file.name;
       // If exclude-weekends is on, re-render so new holidays are factored into display dates
@@ -2206,6 +2369,8 @@ document.addEventListener('keydown',function(e){
   if(isTextEditingTarget(document.activeElement)) return;
   if(!(e.ctrlKey || e.metaKey) || e.altKey) return;
   var key = (e.key || '').toLowerCase();
+  if(key === 'z') { e.preventDefault(); undo(); return; }
+  if(key === 'y') { e.preventDefault(); redo(); return; }
   if(key === 'c') {
     if(copySelectionToClipboard()) e.preventDefault();
     return;
@@ -2214,8 +2379,9 @@ document.addEventListener('keydown',function(e){
     if(pasteClipboardAtHover()) e.preventDefault();
   }
 });
-document.getElementById('btnReset').addEventListener('click',function(){
+function doReset(){
   if(!confirm('Reset tasks and phases to the last loaded state?'))return;
+  clearUndoHistory();
   phases=deepClone(DEFAULT_PHASES);
   tasks=deepClone(DEFAULTS); markers=deepClone(DEFAULT_MARKERS); selectedId=null; exitLinkMode();
   selectedIds=[]; selectionAnchorId=null;
@@ -2223,7 +2389,49 @@ document.getElementById('btnReset').addEventListener('click',function(){
   document.getElementById('taskDetail').className=''; document.getElementById('taskDetail').innerHTML=''; document.getElementById('hint').style.display='';
   syncPhaseUI(false);
   renderGantt();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  MENU BAR
+// ─────────────────────────────────────────────────────────────────
+var menuActions = {
+  save: doSaveJson, load: doLoadJson,
+  savePhases: doSavePhases, loadPhases: doLoadPhases,
+  loadHolidays: doLoadHolidays,
+  exportPng: doExportPng, exportPdf: doExportPdf,
+  reset: doReset,
+  undo: undo, redo: redo,
+  copy: function(){ copySelectionToClipboard(); },
+  paste: function(){ pasteClipboardAtHover(); }
+};
+function closeAllMenus(){ document.querySelectorAll('.menu-item.open').forEach(function(el){ el.classList.remove('open'); }); }
+document.querySelectorAll('.menu-trigger').forEach(function(trigger){
+  trigger.addEventListener('click', function(e){
+    e.stopPropagation();
+    var item = trigger.parentElement;
+    var wasOpen = item.classList.contains('open');
+    closeAllMenus();
+    if(!wasOpen) item.classList.add('open');
+  });
 });
+document.querySelectorAll('.menu-action').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var action = btn.dataset.action;
+    closeAllMenus();
+    if(action && menuActions[action]) menuActions[action]();
+  });
+});
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.menu-item')) closeAllMenus();
+});
+updateUndoMenuState();
+document.getElementById('btnSave').addEventListener('click', doSaveJson);
+document.getElementById('btnLoad').addEventListener('click', doLoadJson);
+document.getElementById('btnExportPng').addEventListener('click', doExportPng);
+document.getElementById('btnExportPdf').addEventListener('click', doExportPdf);
+document.getElementById('btnReset').addEventListener('click', doReset);
+document.getElementById('btnSavePhases').addEventListener('click', doSavePhases);
+document.getElementById('btnLoadPhases').addEventListener('click', doLoadPhases);
 
 // ─────────────────────────────────────────────────────────────────
 //  HEADER CONTROLS

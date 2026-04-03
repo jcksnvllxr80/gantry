@@ -83,6 +83,8 @@ Older data with `start` and `end` still loads, but the app saves tasks back as `
 ## Features
 
 - Single-file app with no build step
+- File and Edit menus for save/load/export and undo/redo/copy/paste
+- Undo/redo with Ctrl+Z / Ctrl+Y (50-level history)
 - User-defined phases with in-app create/load/save
 - Day, week, and month timeline views
 - Row height and timeline width zoom controls
