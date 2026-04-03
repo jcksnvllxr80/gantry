@@ -246,7 +246,19 @@
       width: 280px; min-width: 280px; background: var(--surface);
       border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;
     }
+    .sidebar-tabs { display: flex; margin: -13px -13px 13px; border-bottom: 1px solid var(--border); }
+    .sidebar-tab {
+      flex: 1; border: none; border-right: 1px solid var(--border);
+      background: var(--surface2); color: var(--muted); cursor: pointer;
+      font-size: 12px; font-weight: 600; padding: 10px 12px;
+      transition: background .12s, color .12s;
+    }
+    .sidebar-tab:last-child { border-right: none; }
+    .sidebar-tab:hover { color: var(--text); }
+    .sidebar-tab.active { background: var(--surface); color: var(--text); }
     .sidebar-inner { flex: 1; overflow-y: auto; padding: 13px; }
+    .sidebar-panel { display: none; }
+    .sidebar-panel.active { display: block; }
     .sec-title {
       font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
       color: var(--muted); margin-bottom: 7px; margin-top: 13px;
@@ -439,29 +451,38 @@
 
   <aside class="sidebar">
     <div class="sidebar-inner">
-      <div class="stats-row" id="statsRow"></div>
-
-      <div class="sec-title">Task Details</div>
-      <div class="hint-box" id="hint">
-        <strong style="color:var(--text)">Click</strong> a bar to select &amp; edit.<br>
-        <strong style="color:var(--text)">Drag</strong> to reschedule &mdash; downstream cascades.<br>
-        Click a <strong style="color:var(--text)">task bar</strong> to see its dependencies. Each linked task shows a <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:rgba(248,81,73,.25);border:1px solid rgba(248,81,73,.5);color:#f85149;font-weight:700;font-size:11px;">&#x2715;</span> button &mdash; click it to remove that dependency arrow.<br>
-        <strong style="color:var(--text)">Link</strong> button to draw a new dependency.<br>
-        <strong style="color:var(--text)">Save/Load JSON</strong> to persist changes.<br>
-        <strong style="color:var(--text)">PNG / PDF</strong> to export the chart.
+      <div class="sidebar-tabs" id="sidebarTabs">
+        <button class="sidebar-tab active" data-sidebar-tab="task">Task</button>
+        <button class="sidebar-tab" data-sidebar-tab="phases">Phases</button>
       </div>
-      <div id="taskDetail"></div>
 
-      <div class="sec-title">Phases</div>
-      <div class="phase-note">Create your own phase set here, or load a phase preset JSON. Saved chart JSON files also carry phase definitions.</div>
-      <div class="phase-toolbar">
-        <button class="btn" id="btnLoadPhases">Load Phases</button>
-        <button class="btn" id="btnSavePhases">Save Phases</button>
+      <div class="sidebar-panel active" id="taskPanel">
+        <div class="stats-row" id="statsRow"></div>
+
+        <div class="sec-title">Task Details</div>
+        <div class="hint-box" id="hint">
+          <strong style="color:var(--text)">Click</strong> a bar to select &amp; edit.<br>
+          <strong style="color:var(--text)">Drag</strong> to reschedule &mdash; downstream cascades.<br>
+          Click a <strong style="color:var(--text)">task bar</strong> to see its dependencies. Each linked task shows a <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:rgba(248,81,73,.25);border:1px solid rgba(248,81,73,.5);color:#f85149;font-weight:700;font-size:11px;">&#x2715;</span> button &mdash; click it to remove that dependency arrow.<br>
+          <strong style="color:var(--text)">Link</strong> button to draw a new dependency.<br>
+          <strong style="color:var(--text)">Save/Load JSON</strong> to persist changes.<br>
+          <strong style="color:var(--text)">PNG / PDF</strong> to export the chart.
+        </div>
+        <div id="taskDetail"></div>
       </div>
-      <div id="phaseManager"></div>
 
-      <div class="sec-title">Legend</div>
-      <div class="legend" id="legend"></div>
+      <div class="sidebar-panel" id="phasesPanel">
+        <div class="sec-title">Phases</div>
+        <div class="phase-note">Create your own phase set here, or load a phase preset JSON. Saved chart JSON files also carry phase definitions.</div>
+        <div class="phase-toolbar">
+          <button class="btn" id="btnLoadPhases">Load Phases</button>
+          <button class="btn" id="btnSavePhases">Save Phases</button>
+        </div>
+        <div id="phaseManager"></div>
+
+        <div class="sec-title">Legend</div>
+        <div class="legend" id="legend"></div>
+      </div>
     </div>
   </aside>
 </div>
@@ -770,7 +791,7 @@ function renderPhaseManager() {
       var nextName = input.value.trim();
       phase.name = nextName || phase.name;
       syncPhaseUI(false);
-      if(selectedId) showDetail(selectedId);
+      if(selectedId && activeSidebarTab === 'task') showDetail(selectedId);
     });
   });
   host.querySelectorAll('[data-phase-color]').forEach(function(input){
@@ -779,7 +800,7 @@ function renderPhaseManager() {
       if(!phase) return;
       phase.color = normaliseHexColor(input.value, phase.color);
       syncPhaseUI(false);
-      if(selectedId) showDetail(selectedId);
+      if(selectedId && activeSidebarTab === 'task') showDetail(selectedId);
     });
   });
   host.querySelectorAll('[data-phase-delete]').forEach(function(btn){
@@ -794,8 +815,16 @@ function renderPhaseManager() {
       color: colorFromIndex(phases.length)
     });
     syncPhaseUI(false);
-    if(selectedId) showDetail(selectedId);
+    if(selectedId && activeSidebarTab === 'task') showDetail(selectedId);
   });
+}
+function setSidebarTab(tab) {
+  activeSidebarTab = tab === 'phases' ? 'phases' : 'task';
+  document.querySelectorAll('.sidebar-tab').forEach(function(btn){
+    btn.classList.toggle('active', btn.dataset.sidebarTab === activeSidebarTab);
+  });
+  document.getElementById('taskPanel').classList.toggle('active', activeSidebarTab === 'task');
+  document.getElementById('phasesPanel').classList.toggle('active', activeSidebarTab === 'phases');
 }
 function syncPhaseUI(keepDetail) {
   syncTaskPhases(tasks);
@@ -899,6 +928,7 @@ var tasks           = [];
 var phases          = [];
 var gantt           = null;
 var selectedId      = null;
+var activeSidebarTab = 'task';
 var linkMode        = false;
 var linkSource      = null;
 var excludeWeekends = false;
@@ -975,6 +1005,7 @@ function clearSelectionUI() {
   selectedId = null;
   selectedIds = [];
   selectionAnchorId = null;
+  setSidebarTab('task');
   document.getElementById('taskDetail').className='';
   document.getElementById('taskDetail').innerHTML='';
   document.getElementById('hint').style.display='';
@@ -1563,6 +1594,7 @@ function handleBarClick(id, evt){
 }
 
 function showMultiDetail(id, chosen) {
+  setSidebarTab('task');
   var primary = tasks.find(function(task){ return task.id===id; }) || chosen[0];
   var detail=document.getElementById('taskDetail');
   document.getElementById('hint').style.display='none';
@@ -1630,6 +1662,7 @@ function showMultiDetail(id, chosen) {
 //  SIDEBAR — TASK DETAIL
 // ─────────────────────────────────────────────────────────────────
 function showDetail(id) {
+  setSidebarTab('task');
   if(!isTaskSelected(id)) assignSelection([id], id);
   selectedId=id;
   var chosen=selectedTasks();
@@ -1853,7 +1886,7 @@ document.getElementById('phaseFileInput').addEventListener('change', function(e)
       DEFAULTS = deepClone(tasks);
       syncPhaseUI(false);
       renderGantt();
-      if(selectedId) showDetail(selectedId);
+      if(selectedId && activeSidebarTab === 'task') showDetail(selectedId);
     }catch(err){alert('Failed to load phases: '+err.message);}
   };
   reader.readAsText(file);
@@ -1996,6 +2029,10 @@ document.getElementById('viewGroup').addEventListener('click',function(e){
   document.querySelectorAll('.view-group button').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active'); renderGantt(); if(selectedId) showDetail(selectedId);
 });
+document.getElementById('sidebarTabs').addEventListener('click', function(e){
+  var btn = e.target.closest('[data-sidebar-tab]'); if(!btn)return;
+  setSidebarTab(btn.dataset.sidebarTab);
+});
 document.getElementById('btnLinkMode').addEventListener('click',function(){ linkMode?exitLinkMode():enterLinkMode(); });
 document.getElementById('btnCancelLink').addEventListener('click',exitLinkMode);
 document.addEventListener('keydown',function(e){
@@ -2045,6 +2082,7 @@ document.getElementById('zoomColOut').addEventListener('click', function(){
 // ─────────────────────────────────────────────────────────────────
 try{ applyTheme(localStorage.getItem('gantry-theme')==='light'); }catch(e){ applyTheme(false); }
 try{ if(localStorage.getItem('gantry-excl-weekends')==='1') applyExcludeWeekends(true); }catch(e){}
+setSidebarTab(activeSidebarTab);
 syncPhaseUI(false);
 renderGantt();
 </script>

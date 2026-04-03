@@ -31,10 +31,13 @@ PNG, or PDF.
 
 Phases are user-defined. You can:
 
-- create, rename, recolor, and delete phases in the sidebar
+- use the right sidebar tabs: `Task` for task editing, `Phases` for phase management
+- create, rename, recolor, and delete phases in the `Phases` tab
 - save the current phase set as a phase-only JSON file
 - load a phase-only JSON file before adding tasks
 - save full chart JSON files that include both `phases` and `tasks`
+
+Clicking a task bar in the chart switches the sidebar back to the `Task` tab automatically.
 
 ## Task Format
 
