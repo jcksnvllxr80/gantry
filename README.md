@@ -13,18 +13,28 @@ PNG, or PDF.
 ## Getting Started
 
 1. Open `gantt.html` in a browser.
-2. Click `Add Task`.
-3. Enter task name, start date, days of effort, assignee, phase, and note.
-4. Use `Link` to connect dependencies.
-5. Use `Save JSON` to export the current state.
+2. Create phases in the sidebar, or load `conf/phases-starter.json`.
+3. Click `Add Task`.
+4. Enter task name, start date, days of effort, assignee, phase, and note.
+5. Use `Link` to connect dependencies.
+6. Use `Save JSON` to export the current state.
 
 ## Edit An Existing Chart
 
 1. Open `gantt.html` in a browser.
-2. Browse for your previously saved config file (json) to define the default tasks.
+2. Browse for your previously saved chart config JSON, or load a phase-only JSON first and then add tasks.
 3. Browse for (or create) your holidays file (json) to define holidays for shading and workday scheduling.
 4. Decide whether to disable weekends for workday-based scheduling.
 5. When done editing, save to PNG or PDF, and export the updated JSON.
+
+## Phase Sets
+
+Phases are user-defined. You can:
+
+- create, rename, recolor, and delete phases in the sidebar
+- save the current phase set as a phase-only JSON file
+- load a phase-only JSON file before adding tasks
+- save full chart JSON files that include both `phases` and `tasks`
 
 ## Task Format
 
@@ -37,16 +47,27 @@ PNG, or PDF.
   "progress": 0,
   "dependencies": "task0",
   "assignee": "John Doe",
-  "phase": 1,
+  "phase": "production",
   "done": false,
   "tbd": false,
   "note": ""
 }
 ```
 
+Example phase set:
+
+```json
+{
+  "phases": [
+    { "id": "discovery", "name": "Discovery", "color": "#B35C00" },
+    { "id": "production", "name": "Production", "color": "#0969DA" }
+  ]
+}
+```
+
 Rules:
 
-- `phase`: `1` = POC, `2` = Production
+- `phase`: stores the phase `id` from the loaded phase set
 - `dependencies`: comma-separated task IDs
 - `daysOfEffort` counts the start date as day 1
 - dates use `YYYY-MM-DD`
@@ -58,6 +79,7 @@ Older data with `start` and `end` still loads, but the app saves tasks back as `
 ## Features
 
 - Single-file app with no build step
+- User-defined phases with in-app create/load/save
 - Day, week, and month timeline views
 - Row height and timeline width zoom controls
 - Drag-to-reschedule editing

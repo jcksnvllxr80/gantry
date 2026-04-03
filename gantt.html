@@ -192,27 +192,54 @@
     :root.light .weekend-shade rect.weekend-cell { fill: rgba(200,20,20,0.10) !important; }
     :root.light .weekend-shade rect.holiday-cell { fill: rgba(110,110,110,0.18) !important; }
     :root.light .weekend-shade rect.weekend-holiday-cell { fill: rgba(145,95,95,0.18) !important; }
-    .phase-labels { margin-bottom: 8px; }
+    .phase-labels { margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 5px; }
     .phase-pill {
       display: inline-block; font-size: 11px; font-weight: 700;
       text-transform: uppercase; letter-spacing: .06em;
-      padding: 3px 9px; border-radius: 20px; margin-right: 5px;
+      padding: 3px 9px; border-radius: 20px;
     }
-    .phase-pill.poc  { background: #dafbe1; color: #1a7f37; }
-    .phase-pill.prod { background: #ddf4ff; color: #0550ae; }
     .phase-pill.done { background: #eaeef2; color: #57606a; }
     .phase-pill.tbd  { background: #fff8c5; color: #7d4e00; }
 
     .bar-wrapper.bar-done .bar { fill: #8c959f !important; }
     .bar-wrapper.bar-done .bar-label     { fill: #000 !important; }
     .bar-wrapper.bar-done .bar-label.big { fill: #333 !important; }
-    .bar-wrapper.bar-poc  .bar { fill: #2da44e !important; }
-    .bar-wrapper.bar-prod .bar { fill: #0969da !important; }
     .bar-wrapper.bar-tbd  .bar { fill: #bf8700 !important; }
     .bar-wrapper .bar-progress  { fill: rgba(255,255,255,.28) !important; }
     #gantt svg, #reorderOverlay { user-select: none; }
     .today-highlight { fill: rgba(9,105,218,.06) !important; }
     .bar-wrapper.link-source .bar { fill: #db6d28 !important; stroke: #ff9a4d !important; stroke-width: 2px !important; }
+    .phase-empty {
+      font-size: 12px; color: var(--muted); font-style: italic;
+      margin-bottom: 8px; line-height: 1.5;
+    }
+    .phase-toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+    .phase-toolbar .btn { flex: 1; text-align: center; padding: 5px 9px; }
+    .phase-list { display: flex; flex-direction: column; gap: 8px; }
+    .phase-row {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px;
+    }
+    .phase-row-main { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; }
+    .phase-swatch {
+      width: 28px; height: 28px; border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.16);
+    }
+    .phase-color-input {
+      width: 28px; height: 28px; padding: 0; border-radius: 6px;
+      border: none; background: transparent; cursor: pointer;
+    }
+    .phase-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+    .phase-color-input::-webkit-color-swatch {
+      border: 1px solid rgba(255,255,255,.18); border-radius: 6px;
+    }
+    .phase-meta {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 6px; gap: 8px; font-size: 11px; color: var(--muted);
+    }
+    .phase-note { font-size: 11px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
+    .phase-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .phase-actions .btn { flex: 1; text-align: center; }
 
     /* SIDEBAR */
     .sidebar {
@@ -404,12 +431,7 @@
 <div class="body">
   <div class="gantt-pane" id="ganttPane">
     <div class="gantt-card" id="ganttCard">
-      <div class="phase-labels">
-        <span class="phase-pill done">&#10003; Complete</span>
-        <span class="phase-pill poc">Phase 1 &mdash; POC</span>
-        <span class="phase-pill prod">Phase 2 &mdash; Production</span>
-        <span class="phase-pill tbd">Estimate TBD</span>
-      </div>
+      <div class="phase-labels" id="phaseLabels"></div>
       <div id="gantt"></div>
     </div>
     <div id="reorderOverlay"><div id="reorderLine"></div><div id="reorderGhost"></div><div id="selectionBox"></div></div>
@@ -423,20 +445,23 @@
       <div class="hint-box" id="hint">
         <strong style="color:var(--text)">Click</strong> a bar to select &amp; edit.<br>
         <strong style="color:var(--text)">Drag</strong> to reschedule &mdash; downstream cascades.<br>
-        Click a <strong style="color:var(--text)">Phase 2 task bar</strong> to see its dependencies. Each linked task shows a <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:rgba(248,81,73,.25);border:1px solid rgba(248,81,73,.5);color:#f85149;font-weight:700;font-size:11px;">&#x2715;</span> button &mdash; click it to remove that dependency arrow.<br>
+        Click a <strong style="color:var(--text)">task bar</strong> to see its dependencies. Each linked task shows a <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:rgba(248,81,73,.25);border:1px solid rgba(248,81,73,.5);color:#f85149;font-weight:700;font-size:11px;">&#x2715;</span> button &mdash; click it to remove that dependency arrow.<br>
         <strong style="color:var(--text)">Link</strong> button to draw a new dependency.<br>
         <strong style="color:var(--text)">Save/Load JSON</strong> to persist changes.<br>
         <strong style="color:var(--text)">PNG / PDF</strong> to export the chart.
       </div>
       <div id="taskDetail"></div>
 
-      <div class="sec-title">Legend</div>
-      <div class="legend">
-        <div class="legend-item"><div class="legend-swatch" style="background:#8c959f"></div>Complete</div>
-        <div class="legend-item"><div class="legend-swatch" style="background:#2da44e"></div>Phase 1 &mdash; POC</div>
-        <div class="legend-item"><div class="legend-swatch" style="background:#0969da"></div>Phase 2 &mdash; Production</div>
-        <div class="legend-item"><div class="legend-swatch" style="background:#bf8700"></div>Estimate TBD</div>
+      <div class="sec-title">Phases</div>
+      <div class="phase-note">Create your own phase set here, or load a phase preset JSON. Saved chart JSON files also carry phase definitions.</div>
+      <div class="phase-toolbar">
+        <button class="btn" id="btnLoadPhases">Load Phases</button>
+        <button class="btn" id="btnSavePhases">Save Phases</button>
       </div>
+      <div id="phaseManager"></div>
+
+      <div class="sec-title">Legend</div>
+      <div class="legend" id="legend"></div>
     </div>
   </aside>
 </div>
@@ -453,10 +478,7 @@
     </div>
     <div class="field-group">
       <label>Phase</label>
-      <select class="field-input" id="mPhase">
-        <option value="1">Phase 1 &mdash; POC</option>
-        <option value="2">Phase 2 &mdash; Production</option>
-      </select>
+      <select class="field-input" id="mPhase"></select>
     </div>
     <div class="checkbox-row"><input type="checkbox" id="mTbd" /><label for="mTbd">Estimate TBD / duration unknown</label></div>
     <div class="field-group"><label>Note</label><textarea class="field-input" id="mNote" placeholder="Optional notes..."></textarea></div>
@@ -474,10 +496,12 @@
 <!-- Hidden file input for JSON load -->
 <input type="file" id="fileInput" accept=".json,application/json" style="display:none" />
 <input type="file" id="holidayFileInput" accept=".json,application/json" style="display:none" />
+<input type="file" id="phaseFileInput" accept=".json,application/json" style="display:none" />
 
 <script src="lib/frappe-gantt.min.js"></script>
 <script src="lib/html2canvas.min.js"></script>
 <script src="lib/jspdf.umd.min.js"></script>
+<style id="phaseStyles"></style>
 <script>
 // ─────────────────────────────────────────────────────────────────
 //  HELPERS
@@ -485,7 +509,53 @@
 function deepClone(x)    { return JSON.parse(JSON.stringify(x)); }
 function escHtml(s)      { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function slugify(name)   { return name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')+'_'+Math.random().toString(36).slice(2,6); }
-function phaseClass(t)   { return t.done?'bar-done':t.tbd?'bar-tbd':t.phase===1?'bar-poc':'bar-prod'; }
+function slugToken(name) { return String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+function createPhaseId(name) {
+  var base = slugToken(name) || 'phase';
+  return base + '-' + Math.random().toString(36).slice(2, 6);
+}
+function cssSafeToken(value) { return String(value||'').toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-|-$/g,'') || 'phase'; }
+function normaliseHexColor(value, fallback) {
+  var text = String(value || '').trim();
+  if(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(text)) {
+    if(text.length === 4) return '#' + text.slice(1).split('').map(function(ch){ return ch + ch; }).join('').toUpperCase();
+    return text.toUpperCase();
+  }
+  return fallback || '#4C8DFF';
+}
+function colorFromIndex(index) {
+  var hue = Math.round((index * 137.508) % 360);
+  return hslToHex(hue, 62, 46);
+}
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  var c = (1 - Math.abs(2 * l - 1)) * s;
+  var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  var m = l - c / 2;
+  var rgb = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return '#' + rgb.map(function(v){
+    return Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  }).join('').toUpperCase();
+}
+function hexToRgb(hex) {
+  var cleaned = normaliseHexColor(hex, '#4C8DFF').slice(1);
+  return {
+    r: parseInt(cleaned.slice(0, 2), 16),
+    g: parseInt(cleaned.slice(2, 4), 16),
+    b: parseInt(cleaned.slice(4, 6), 16)
+  };
+}
+function phaseCssClass(id) { return 'bar-phase-' + cssSafeToken(id); }
+function phaseById(id) { return phases.find(function(phase){ return phase.id === String(id); }) || null; }
+function phaseName(id) {
+  var phase = phaseById(id);
+  return phase ? phase.name : (id == null || id === '' ? 'No Phase' : String(id));
+}
+function phaseClass(t) {
+  if(t.done) return 'bar-done';
+  if(t.tbd) return 'bar-tbd';
+  return phaseCssClass(t.phase || '');
+}
 function taskMap()       { var m={}; tasks.forEach(function(t){m[t.id]=t;}); return m; }
 function getDeps(t)      { if(!t.dependencies)return[]; if(Array.isArray(t.dependencies))return t.dependencies.filter(Boolean); return t.dependencies.split(',').map(function(s){return s.trim();}).filter(Boolean); }
 function setDeps(t,arr)  { t.dependencies=arr.filter(Boolean).join(','); }
@@ -576,6 +646,226 @@ function serialiseTask(t) {
     note: t.note || ''
   };
 }
+function serialisePhase(phase) {
+  return { id: phase.id, name: phase.name, color: phase.color };
+}
+function normalisePhase(def, index) {
+  var raw = def || {};
+  var name = String(raw.name || raw.id || ('Phase ' + (index + 1))).trim() || ('Phase ' + (index + 1));
+  return {
+    id: String(raw.id || createPhaseId(name)),
+    name: name,
+    color: normaliseHexColor(raw.color, colorFromIndex(index))
+  };
+}
+function inferPhaseName(rawValue, index) {
+  var value = String(rawValue == null ? '' : rawValue).trim();
+  if(!value) return 'Phase ' + (index + 1);
+  if(/^\d+$/.test(value)) return 'Phase ' + value;
+  return value.replace(/[-_]+/g, ' ').replace(/\b\w/g, function(ch){ return ch.toUpperCase(); });
+}
+function buildPhaseList(loadedPhases, loadedTasks) {
+  var out = [];
+  var seen = new Set();
+  (loadedPhases || []).forEach(function(def){
+    var phase = normalisePhase(def, out.length);
+    if(seen.has(phase.id)) return;
+    seen.add(phase.id);
+    out.push(phase);
+  });
+  (loadedTasks || []).forEach(function(task){
+    if(task.phase == null || task.phase === '') return;
+    var id = String(task.phase);
+    if(seen.has(id)) return;
+    seen.add(id);
+    out.push({
+      id: id,
+      name: inferPhaseName(task.phase, out.length),
+      color: colorFromIndex(out.length)
+    });
+  });
+  if(!out.length && loadedTasks && loadedTasks.length) {
+    out.push({
+      id: 'phase-1',
+      name: 'Phase 1',
+      color: colorFromIndex(0)
+    });
+  }
+  return out;
+}
+function phaseOptionsHtml(selectedId, includePlaceholder) {
+  if(!phases.length) {
+    return '<option value="">No phases defined</option>';
+  }
+  var html = includePlaceholder ? '<option value="">Select phase</option>' : '';
+  return html + phases.map(function(phase){
+    return '<option value="'+escHtml(phase.id)+'"'+(String(selectedId||'')===phase.id?' selected':'')+'>'+escHtml(phase.name)+'</option>';
+  }).join('');
+}
+function ensureTaskPhase(task) {
+  var current = task.phase == null ? '' : String(task.phase);
+  if(phases.some(function(phase){ return phase.id === current; })) {
+    task.phase = current;
+  } else {
+    task.phase = phases[0] ? phases[0].id : '';
+  }
+  task.custom_class = phaseClass(task);
+}
+function syncTaskPhases(collection) {
+  (collection || []).forEach(ensureTaskPhase);
+}
+function renderPhaseStyles() {
+  var css = phases.map(function(phase){
+    return '.bar-wrapper.' + phaseCssClass(phase.id) + ' .bar { fill: ' + phase.color + ' !important; }';
+  }).join('\n');
+  document.getElementById('phaseStyles').textContent = css;
+}
+function phasePillHtml(phase) {
+  var rgb = hexToRgb(phase.color);
+  return '<span class="phase-pill" style="background:rgba('+rgb.r+','+rgb.g+','+rgb.b+',.18);color:'+phase.color+'">'+escHtml(phase.name)+'</span>';
+}
+function renderPhaseLabels() {
+  var html = '<span class="phase-pill done">&#10003; Complete</span>';
+  if(phases.length) html += phases.map(phasePillHtml).join('');
+  html += '<span class="phase-pill tbd">Estimate TBD</span>';
+  document.getElementById('phaseLabels').innerHTML = html;
+}
+function renderLegend() {
+  var html = '<div class="legend-item"><div class="legend-swatch" style="background:#8c959f"></div>Complete</div>';
+  html += phases.map(function(phase){
+    return '<div class="legend-item"><div class="legend-swatch" style="background:'+phase.color+'"></div>'+escHtml(phase.name)+'</div>';
+  }).join('');
+  html += '<div class="legend-item"><div class="legend-swatch" style="background:#bf8700"></div>Estimate TBD</div>';
+  document.getElementById('legend').innerHTML = html;
+}
+function refreshPhaseSelectors() {
+  ['mPhase','mfPhase','fPhase'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    var current = el.value;
+    el.innerHTML = phaseOptionsHtml(current, false);
+    el.disabled = !phases.length;
+  });
+}
+function renderPhaseManager() {
+  var host = document.getElementById('phaseManager');
+  var rows = phases.map(function(phase){
+    var usage = tasks.filter(function(task){ return String(task.phase || '') === phase.id; }).length;
+    return '<div class="phase-row" data-phase-id="'+escHtml(phase.id)+'">'+
+      '<div class="phase-row-main">'+
+        '<div class="phase-swatch" style="background:'+phase.color+'"></div>'+
+        '<input class="field-input phase-name-input" type="text" value="'+escHtml(phase.name)+'" data-phase-name="'+escHtml(phase.id)+'" />'+
+        '<input class="phase-color-input" type="color" value="'+phase.color+'" data-phase-color="'+escHtml(phase.id)+'" title="Phase color" />'+
+      '</div>'+
+      '<div class="phase-meta"><span>'+usage+' task'+(usage===1?'':'s')+'</span><button class="btn btn-danger phase-delete-btn" data-phase-delete="'+escHtml(phase.id)+'">Delete</button></div>'+
+    '</div>';
+  }).join('');
+  host.innerHTML = (phases.length ? '<div class="phase-list">'+rows+'</div>' : '<div class="phase-empty">No phases loaded yet. Create one below or load a phase preset JSON first.</div>') +
+    '<div class="phase-actions"><button class="btn btn-green" id="btnAddPhase">+ Add Phase</button></div>';
+
+  host.querySelectorAll('[data-phase-name]').forEach(function(input){
+    input.addEventListener('change', function(){
+      var phase = phaseById(input.dataset.phaseName);
+      if(!phase) return;
+      var nextName = input.value.trim();
+      phase.name = nextName || phase.name;
+      syncPhaseUI(false);
+      if(selectedId) showDetail(selectedId);
+    });
+  });
+  host.querySelectorAll('[data-phase-color]').forEach(function(input){
+    input.addEventListener('input', function(){
+      var phase = phaseById(input.dataset.phaseColor);
+      if(!phase) return;
+      phase.color = normaliseHexColor(input.value, phase.color);
+      syncPhaseUI(false);
+      if(selectedId) showDetail(selectedId);
+    });
+  });
+  host.querySelectorAll('[data-phase-delete]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      deletePhase(btn.dataset.phaseDelete);
+    });
+  });
+  document.getElementById('btnAddPhase').addEventListener('click', function(){
+    phases.push({
+      id: createPhaseId('phase'),
+      name: 'New Phase',
+      color: colorFromIndex(phases.length)
+    });
+    syncPhaseUI(false);
+    if(selectedId) showDetail(selectedId);
+  });
+}
+function syncPhaseUI(keepDetail) {
+  syncTaskPhases(tasks);
+  renderPhaseStyles();
+  renderPhaseLabels();
+  renderLegend();
+  renderPhaseManager();
+  refreshPhaseSelectors();
+  if(keepDetail !== false && selectedId) showDetail(selectedId);
+}
+function deletePhase(phaseId) {
+  var target = phaseById(phaseId);
+  if(!target) return;
+  var remaining = phases.filter(function(phase){ return phase.id !== phaseId; });
+  var usage = tasks.filter(function(task){ return String(task.phase || '') === phaseId; }).length;
+  if(usage && !remaining.length) {
+    alert('Create another phase before deleting the last phase in use.');
+    return;
+  }
+  if(usage && !confirm('Delete "'+target.name+'"? '+usage+' task'+(usage===1?'':'s')+' will move to '+remaining[0].name+'.')) return;
+  phases = remaining;
+  if(usage) {
+    tasks.forEach(function(task){
+      if(String(task.phase || '') === phaseId) task.phase = remaining[0].id;
+      task.custom_class = phaseClass(task);
+    });
+  }
+  syncPhaseUI(false);
+  renderGantt();
+}
+function parseConfigPayload(data) {
+  if(Array.isArray(data)) return { tasks: data, phases: [], title: '' };
+  return {
+    tasks: Array.isArray(data.tasks) ? data.tasks : [],
+    phases: Array.isArray(data.phases) ? data.phases : [],
+    title: data.title || ''
+  };
+}
+function applyLoadedConfig(data, options) {
+  var parsed = parseConfigPayload(data);
+  var nextPhases = buildPhaseList(parsed.phases, parsed.tasks);
+  var nextTasks = parsed.tasks.map(function(task){ return normalise(deepClone(task)); });
+  phases = nextPhases;
+  syncTaskPhases(nextTasks);
+  tasks = nextTasks;
+  DEFAULT_PHASES = deepClone(phases);
+  DEFAULTS = deepClone(tasks);
+  if((options || {}).updateTitle && parsed.title) {
+    document.getElementById('appTitle').textContent = parsed.title;
+    document.title = parsed.title + ' — Gantry';
+  }
+  selectedId = null;
+  selectedIds = [];
+  selectionAnchorId = null;
+  timelineScrollLeft = null;
+  userAdjustedTimelineZoom = false;
+  shouldApplyDefaultViewport = true;
+  exitLinkMode();
+  document.getElementById('taskDetail').className = '';
+  document.getElementById('taskDetail').innerHTML = '';
+  document.getElementById('hint').style.display = '';
+  syncPhaseUI(false);
+  renderGantt();
+}
+function downloadJsonFile(filename, payload) {
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
 
 // Normalise a task loaded from external data (ensure all fields present)
 function normalise(t) {
@@ -584,7 +874,8 @@ function normalise(t) {
   if(!t.assignee)     t.assignee     = 'Unassigned';
   if(t.done    ==null) t.done        = false;
   if(t.tbd     ==null) t.tbd         = false;
-  if(t.phase   ==null) t.phase       = 1;
+  if(t.phase   ==null) t.phase       = '';
+  t.phase = String(t.phase || '');
   if(!t.note)          t.note        = '';
   if(t.progress==null) t.progress    = 0;
   if(!t.dependencies)  t.dependencies= '';
@@ -603,7 +894,9 @@ function normalise(t) {
 // ─────────────────────────────────────────────────────────────────
 // DEFAULTS populated when a JSON file is loaded.
 var DEFAULTS        = [];
+var DEFAULT_PHASES  = [];
 var tasks           = [];
+var phases          = [];
 var gantt           = null;
 var selectedId      = null;
 var linkMode        = false;
@@ -866,6 +1159,11 @@ function applyTimelineZoom() {
   gantt.render();
 }
 function renderGantt() {
+  syncTaskPhases(tasks);
+  renderPhaseStyles();
+  renderPhaseLabels();
+  renderLegend();
+  refreshPhaseSelectors();
   // Guard: frappe crashes on empty task list
   if (!tasks.length) { document.getElementById('gantt').innerHTML=''; updateStats(); return; }
 
@@ -1276,10 +1574,7 @@ function showMultiDetail(id, chosen) {
       '<div class="field-group"><label>Move By Start</label><input class="field-input" type="date" id="mfStart" value="'+primary.start+'" /></div>'+
       '<div class="field-group"><label>Resize By Effort</label><input class="field-input" type="number" id="mfEffort" min="1" step="1" value="'+getTaskEffortDays(primary)+'" /></div>'+
     '</div>'+
-    '<div class="field-group"><label>Batch Phase</label><select class="field-input" id="mfPhase">'+
-      '<option value="1"'+(primary.phase===1?' selected':'')+'>Phase 1 &mdash; POC</option>'+
-      '<option value="2"'+(primary.phase===2?' selected':'')+'>Phase 2 &mdash; Production</option>'+
-    '</select></div>'+
+    '<div class="field-group"><label>Batch Phase</label><select class="field-input" id="mfPhase">'+phaseOptionsHtml(primary.phase, false)+'</select></div>'+
     '<div class="checkbox-row"><input type="checkbox" id="mfDone"'+(primary.done?' checked':'')+' /><label for="mfDone">Mark complete (100%)</label></div>'+
     '<div class="checkbox-row"><input type="checkbox" id="mfTbd"'+(primary.tbd?' checked':'')+' /><label for="mfTbd">Estimate TBD</label></div>'+
     '<div class="field-group"><label>Batch Note</label><textarea class="field-input" id="mfNote">'+escHtml(primary.note||'')+'</textarea></div>'+
@@ -1287,7 +1582,7 @@ function showMultiDetail(id, chosen) {
 
   function batchSaveMeta(){
     var assignee=document.getElementById('mfAssignee').value.trim();
-    var phase=parseInt(document.getElementById('mfPhase').value,10);
+    var phase=document.getElementById('mfPhase').value;
     var done=document.getElementById('mfDone').checked;
     var tbd=document.getElementById('mfTbd').checked;
     var note=document.getElementById('mfNote').value.trim();
@@ -1374,10 +1669,7 @@ function showDetail(id) {
       '<div class="field-group"><label>Days of Effort</label><input class="field-input" type="number" id="fEffort" min="1" step="1" value="'+effortDays+'" /></div>'+
     '</div>'+
     '<div class="field-group"><label>Projected Finish</label><input class="field-input" type="text" value="'+escHtml(fmtDate(projectedFinish))+'" readonly /></div>'+
-    '<div class="field-group"><label>Phase</label><select class="field-input" id="fPhase">'+
-      '<option value="1"'+(t.phase===1?' selected':'')+'>Phase 1 &mdash; POC</option>'+
-      '<option value="2"'+(t.phase===2?' selected':'')+'>Phase 2 &mdash; Production</option>'+
-    '</select></div>'+
+    '<div class="field-group"><label>Phase</label><select class="field-input" id="fPhase">'+phaseOptionsHtml(t.phase, false)+'</select></div>'+
     '<div class="checkbox-row"><input type="checkbox" id="fDone"'+(t.done?' checked':'')+' /><label for="fDone">Mark complete (100%)</label></div>'+
     '<div class="checkbox-row"><input type="checkbox" id="fTbd"'+(t.tbd?' checked':'')+' /><label for="fTbd">Estimate TBD</label></div>'+
     '<div class="field-group"><label>Note</label><textarea class="field-input" id="fNote">'+escHtml(t.note||'')+'</textarea></div>'+
@@ -1395,7 +1687,7 @@ function showDetail(id) {
   function save(){
     var nv=document.getElementById('fName').value.trim(); t.name=nv||t.name;
     t.assignee=document.getElementById('fAssignee').value.trim();
-    t.phase=parseInt(document.getElementById('fPhase').value);
+    t.phase=document.getElementById('fPhase').value;
     t.done=document.getElementById('fDone').checked;
     t.tbd=document.getElementById('fTbd').checked;
     t.note=document.getElementById('fNote').value.trim();
@@ -1452,12 +1744,12 @@ function showDetail(id) {
 function updateStats(){
   var total=tasks.length,done=tasks.filter(function(t){return t.done;}).length,
       tbd=tasks.filter(function(t){return t.tbd&&!t.done;}).length,
-      lastEnd=tasks.map(function(t){return taskEndDate(t);}).sort().slice(-1)[0];
+      lastEnd=total ? tasks.map(function(t){return taskEndDate(t);}).sort().slice(-1)[0] : '';
   document.getElementById('statsRow').innerHTML=
     '<div class="stat-chip"><strong>'+total+'</strong> tasks</div>'+
     '<div class="stat-chip"><strong>'+done+'</strong> complete</div>'+
     '<div class="stat-chip"><strong>'+tbd+'</strong> TBD</div>'+
-    '<div class="stat-chip">Ships <strong>'+fmtDate(lastEnd)+'</strong></div>';
+    '<div class="stat-chip">'+(lastEnd ? 'Ships <strong>'+fmtDate(lastEnd)+'</strong>' : 'No tasks loaded')+'</div>';
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1467,7 +1759,10 @@ function openModal(){
   var today=toISO(new Date());
   document.getElementById('mName').value=''; document.getElementById('mAssignee').value='';
   document.getElementById('mStart').value=today; document.getElementById('mEffort').value='14';
-  document.getElementById('mPhase').value='1'; document.getElementById('mTbd').checked=false;
+  document.getElementById('mPhase').innerHTML=phaseOptionsHtml(phases[0] ? phases[0].id : '', false);
+  document.getElementById('mPhase').value=phases[0] ? phases[0].id : '';
+  document.getElementById('mPhase').disabled=!phases.length;
+  document.getElementById('mTbd').checked=false;
   document.getElementById('mNote').value=''; document.getElementById('mError').style.display='none';
   document.getElementById('modalBackdrop').classList.add('open');
   setTimeout(function(){document.getElementById('mName').focus();},50);
@@ -1484,12 +1779,13 @@ document.getElementById('btnModalAdd').addEventListener('click',function(){
   if(!name){err.textContent='Task name is required.';err.style.display='block';return;}
   if(!start){err.textContent='Start date is required.';err.style.display='block';return;}
   if(effort < 1){err.textContent='Days of effort must be at least 1.';err.style.display='block';return;}
-  var phase=parseInt(document.getElementById('mPhase').value),tbd=document.getElementById('mTbd').checked,
+  if(!phases.length){err.textContent='Create or load at least one phase before adding tasks.';err.style.display='block';return;}
+  var phase=document.getElementById('mPhase').value,tbd=document.getElementById('mTbd').checked,
       note=document.getElementById('mNote').value.trim(),
       assignee=document.getElementById('mAssignee').value.trim()||'Unassigned';
   var nt={id:slugify(name),name:name,start:start,daysOfEffort:effort,progress:0,dependencies:'',
           assignee:assignee,phase:phase,done:false,tbd:tbd,note:note,
-          custom_class:tbd?'bar-tbd':phase===1?'bar-poc':'bar-prod'};
+          custom_class:tbd?'bar-tbd':phaseCssClass(phase)};
   tasks.push(nt); closeModal(); renderGantt(); showDetail(nt.id);
 });
 
@@ -1507,17 +1803,14 @@ document.getElementById('btnTheme').addEventListener('click',function(){ applyTh
 //  SAVE / LOAD JSON
 // ─────────────────────────────────────────────────────────────────
 document.getElementById('btnSave').addEventListener('click',function(){
-  var data=JSON.stringify({
+  var slug=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  downloadJsonFile(slug+'-'+toISO(new Date())+'.json', {
     version:2,
     savedAt:new Date().toISOString(),
     title:document.getElementById('appTitle').textContent,
+    phases:phases.map(serialisePhase),
     tasks:tasks.map(serialiseTask)
-  },null,2);
-  var blob=new Blob([data],{type:'application/json'});
-  var url=URL.createObjectURL(blob),a=document.createElement('a');
-  var slug=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-  a.href=url; a.download=slug+'-'+toISO(new Date())+'.json';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  });
 });
 document.getElementById('btnLoad').addEventListener('click',function(){ document.getElementById('fileInput').value=''; document.getElementById('fileInput').click(); });
 document.getElementById('fileInput').addEventListener('change',function(e){
@@ -1526,18 +1819,42 @@ document.getElementById('fileInput').addEventListener('change',function(e){
   reader.onload=function(ev){
     try{
       var data=JSON.parse(ev.target.result);
-      var loaded=Array.isArray(data)?data:(data.tasks||null);
-      if(!Array.isArray(loaded)||!loaded.length){alert('Invalid file: no tasks array found.');return;}
-      if(!Array.isArray(data)&&data.title){
-        document.getElementById('appTitle').textContent=data.title;
-        document.title=data.title+' — Gantry';
-      }
-      DEFAULTS=loaded.map(function(t){return normalise(deepClone(t));});
-      tasks=deepClone(DEFAULTS);
-      selectedId=null; exitLinkMode();
-      document.getElementById('taskDetail').className=''; document.getElementById('hint').style.display='';
-      renderGantt();
+      var parsed = parseConfigPayload(data);
+      if(!parsed.tasks.length && !parsed.phases.length){alert('Invalid file: expected tasks, phases, or both.');return;}
+      applyLoadedConfig(data, { updateTitle: true });
     }catch(err){alert('Failed to load: '+err.message);}
+  };
+  reader.readAsText(file);
+});
+document.getElementById('btnSavePhases').addEventListener('click', function(){
+  if(!phases.length){ alert('No phases to save.'); return; }
+  var slug=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  downloadJsonFile(slug+'-phases-'+toISO(new Date())+'.json', {
+    version: 1,
+    name: (document.getElementById('appTitle').textContent || 'Gantry') + ' Phases',
+    phases: phases.map(serialisePhase)
+  });
+});
+document.getElementById('btnLoadPhases').addEventListener('click', function(){
+  document.getElementById('phaseFileInput').value='';
+  document.getElementById('phaseFileInput').click();
+});
+document.getElementById('phaseFileInput').addEventListener('change', function(e){
+  var file=e.target.files[0]; if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var data=JSON.parse(ev.target.result);
+      var nextPhases = buildPhaseList(Array.isArray(data) ? data : data.phases, []);
+      if(!nextPhases.length){alert('Invalid phase file: expected phases array.');return;}
+      phases = nextPhases;
+      syncTaskPhases(tasks);
+      DEFAULT_PHASES = deepClone(phases);
+      DEFAULTS = deepClone(tasks);
+      syncPhaseUI(false);
+      renderGantt();
+      if(selectedId) showDetail(selectedId);
+    }catch(err){alert('Failed to load phases: '+err.message);}
   };
   reader.readAsText(file);
 });
@@ -1695,10 +2012,13 @@ document.addEventListener('keydown',function(e){
   }
 });
 document.getElementById('btnReset').addEventListener('click',function(){
-  if(!confirm('Reset all tasks to the last loaded state?'))return;
+  if(!confirm('Reset tasks and phases to the last loaded state?'))return;
+  phases=deepClone(DEFAULT_PHASES);
   tasks=deepClone(DEFAULTS); selectedId=null; exitLinkMode();
+  selectedIds=[]; selectionAnchorId=null;
   timelineScrollLeft=null; userAdjustedTimelineZoom=false; shouldApplyDefaultViewport=true;
-  document.getElementById('taskDetail').className=''; document.getElementById('hint').style.display='';
+  document.getElementById('taskDetail').className=''; document.getElementById('taskDetail').innerHTML=''; document.getElementById('hint').style.display='';
+  syncPhaseUI(false);
   renderGantt();
 });
 
@@ -1725,6 +2045,7 @@ document.getElementById('zoomColOut').addEventListener('click', function(){
 // ─────────────────────────────────────────────────────────────────
 try{ applyTheme(localStorage.getItem('gantry-theme')==='light'); }catch(e){ applyTheme(false); }
 try{ if(localStorage.getItem('gantry-excl-weekends')==='1') applyExcludeWeekends(true); }catch(e){}
+syncPhaseUI(false);
 renderGantt();
 </script>
 </body>

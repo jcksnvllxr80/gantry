@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "Starter Phases",
+  "phases": [
+    { "id": "discovery", "name": "Discovery", "color": "#B35C00" },
+    { "id": "poc", "name": "POC", "color": "#2DA44E" },
+    { "id": "pilot", "name": "Pilot", "color": "#8250DF" },
+    { "id": "production", "name": "Production", "color": "#0969DA" },
+    { "id": "maintenance", "name": "Maintenance", "color": "#6E7781" }
+  ]
+}

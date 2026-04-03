@@ -2,6 +2,13 @@
   "version": 2,
   "savedAt": "2026-04-03T01:00:52.651Z",
   "title": "Gantry Demo - Moonbase Snack Ops",
+  "phases": [
+    { "id": "discovery", "name": "Discovery", "color": "#B35C00" },
+    { "id": "poc", "name": "POC", "color": "#2DA44E" },
+    { "id": "pilot", "name": "Pilot", "color": "#8250DF" },
+    { "id": "production", "name": "Production", "color": "#0969DA" },
+    { "id": "maintenance", "name": "Maintenance", "color": "#6E7781" }
+  ],
   "tasks": [
     {
       "id": "idea-jam",
@@ -11,7 +18,7 @@
       "progress": 100,
       "dependencies": "",
       "assignee": "Captain Crumb",
-      "phase": 1,
+      "phase": "discovery",
       "done": true,
       "tbd": false,
       "note": "Shortlist includes Meteor Macaron, Nebula Nachos, and Comet Corn Dogs."
@@ -24,7 +31,7 @@
       "progress": 100,
       "dependencies": "idea-jam",
       "assignee": "Dr. Sprinkle",
-      "phase": 1,
+      "phase": "poc",
       "done": true,
       "tbd": false,
       "note": "Three recipes survived the crumb explosion tests."
@@ -37,7 +44,7 @@
       "progress": 50,
       "dependencies": "prototype-bites",
       "assignee": "Unit SNAX-9",
-      "phase": 1,
+      "phase": "poc",
       "done": false,
       "tbd": false,
       "note": "Current bias toward anything dusted with cinnamon."
@@ -50,7 +57,7 @@
       "progress": 20,
       "dependencies": "prototype-bites",
       "assignee": "Velvet Vega",
-      "phase": 2,
+      "phase": "pilot",
       "done": false,
       "tbd": false,
       "note": "Direction: luxury cereal box meets retro space motel."
@@ -63,7 +70,7 @@
       "progress": 0,
       "dependencies": "robot-taste-panel,packaging-art",
       "assignee": "DJ Crater",
-      "phase": 2,
+      "phase": "production",
       "done": false,
       "tbd": false,
       "note": "The script requires one heroic slow-motion chip toss."
@@ -76,7 +83,7 @@
       "progress": 0,
       "dependencies": "launch-video",
       "assignee": "Orbit Pam",
-      "phase": 2,
+      "phase": "production",
       "done": false,
       "tbd": false,
       "note": "Merch bundle includes snack tin, sticker sheet, and emergency napkin."
@@ -89,7 +96,7 @@
       "progress": 0,
       "dependencies": "gift-shop-rollout",
       "assignee": "Professor Umami",
-      "phase": 2,
+      "phase": "maintenance",
       "done": false,
       "tbd": true,
       "note": "Candidates remain classified until legal clears the pickle glitter."
