@@ -235,6 +235,21 @@
     .marker-color-input { position: absolute; width: 0; height: 0; opacity: 0; overflow: hidden; pointer-events: none; }
     .marker-delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 16px; padding: 2px 4px; flex: none; }
     .marker-actions { margin-top: 8px; }
+    .holiday-list { display: flex; flex-direction: column; gap: 6px; }
+    .holiday-item {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 10px; cursor: pointer; transition: border-color .12s, background .12s;
+    }
+    .holiday-item:hover { border-color: var(--accent); background: rgba(88,166,255,.08); }
+    .holiday-item-date { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+    .holiday-item-name { font-size: 12px; color: var(--text); line-height: 1.4; }
+    .holiday-item-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .panel-sep { border: none; border-top: 1px solid var(--border); margin: 16px 0 8px; }
+    .weekend-shade rect.holiday-focus,
+    .weekend-shade rect.weekend-holiday-cell.holiday-focus {
+      stroke: #f2cc60; stroke-width: 2px; fill: rgba(242,204,96,.28) !important;
+      filter: drop-shadow(0 0 5px rgba(242,204,96,.35));
+    }
     .phase-labels { margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 5px; }
     .phase-pill {
       display: inline-block; font-size: 11px; font-weight: 700;
@@ -552,13 +567,17 @@
         </div>
         <div id="phaseManager"></div>
 
-        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 8px" />
+        <hr class="panel-sep" />
         <div class="sec-title">Legend</div>
         <div class="legend" id="legend"></div>
 
-        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 8px" />
+        <hr class="panel-sep" />
         <div class="sec-title">Timeline Markers</div>
         <div id="markerManager"></div>
+
+        <hr class="panel-sep" />
+        <div class="sec-title">Holidays</div>
+        <div id="holidayManager"></div>
       </div>
     </div>
   </aside>
@@ -979,6 +998,40 @@ function markerById(id) {
   for(var i = 0; i < markers.length; i++) if(markers[i].id === id) return markers[i];
   return null;
 }
+function holidayInfoForDate(date) {
+  return holidayEntries.filter(function(entry){ return entry.date === date; });
+}
+function renderHolidayManager() {
+  var host = document.getElementById('holidayManager');
+  if(!host) return;
+  if(!holidayEntries.length) {
+    host.innerHTML = '<div class="phase-empty">No holidays loaded.</div>';
+    return;
+  }
+  host.innerHTML = '<div class="holiday-list">' + holidayEntries.map(function(entry){
+    return '<button class="holiday-item" type="button" data-holiday-date="'+escHtml(entry.date)+'">'+
+      '<div class="holiday-item-date">'+escHtml(fmtDate(entry.date))+'</div>'+
+      '<div class="holiday-item-name">'+escHtml(entry.name || 'Holiday')+'</div>'+
+      '<div class="holiday-item-meta">'+escHtml(entry.date)+'</div>'+
+    '</button>';
+  }).join('') + '</div>';
+  host.querySelectorAll('[data-holiday-date]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      flashHoliday(btn.dataset.holidayDate);
+    });
+  });
+}
+function flashHoliday(date) {
+  highlightedHolidayDate = date || '';
+  renderGantt();
+  if(holidayHighlightTimer) clearTimeout(holidayHighlightTimer);
+  if(!highlightedHolidayDate) return;
+  holidayHighlightTimer = setTimeout(function(){
+    highlightedHolidayDate = '';
+    holidayHighlightTimer = null;
+    renderGantt();
+  }, 1800);
+}
 function setSidebarTab(tab) {
   activeSidebarTab = tab === 'phases' ? 'phases' : 'task';
   document.querySelectorAll('.sidebar-tab').forEach(function(btn){
@@ -994,6 +1047,7 @@ function syncPhaseUI(keepDetail) {
   renderLegend();
   renderPhaseManager();
   renderMarkerManager();
+  renderHolidayManager();
   refreshPhaseSelectors();
   if(keepDetail !== false && selectedId) showDetail(selectedId);
 }
@@ -1019,11 +1073,12 @@ function deletePhase(phaseId) {
   renderGantt();
 }
 function parseConfigPayload(data) {
-  if(Array.isArray(data)) return { tasks: data, phases: [], markers: [], title: '' };
+  if(Array.isArray(data)) return { tasks: data, phases: [], markers: [], settings: null, title: '' };
   return {
     tasks: Array.isArray(data.tasks) ? data.tasks : [],
     phases: Array.isArray(data.phases) ? data.phases : [],
     markers: Array.isArray(data.markers) ? data.markers : [],
+    settings: data.settings || null,
     title: data.title || ''
   };
 }
@@ -1056,6 +1111,18 @@ function applyLoadedConfig(data, options) {
   document.getElementById('taskDetail').innerHTML = '';
   document.getElementById('hint').style.display = '';
   syncPhaseUI(false);
+  if(parsed.settings) {
+    var s = parsed.settings;
+    if(s.viewMode && /^(Day|Week|Month)$/.test(s.viewMode)) {
+      document.querySelectorAll('.view-group button').forEach(function(b){ b.classList.remove('active'); });
+      var vb = document.querySelector('.view-group button[data-view="'+s.viewMode+'"]');
+      if(vb) vb.classList.add('active');
+    }
+    if(typeof s.colWidth === 'number') COL_WIDTH = Math.max(COL_MIN, Math.min(COL_MAX, s.colWidth));
+    if(typeof s.barHeight === 'number') BAR_HEIGHT = Math.max(BAR_MIN, Math.min(BAR_MAX, s.barHeight));
+    if(s.theme === 'light' || s.theme === 'dark') applyTheme(s.theme === 'light');
+    userAdjustedTimelineZoom = true;
+  }
   renderGantt();
 }
 function downloadJsonFile(filename, payload) {
@@ -1103,7 +1170,10 @@ var linkSource      = null;
 var excludeWeekends = false;
 var excludeHolidays = false;   // holiday shading/exclusion toggle
 var holidaySet      = new Set();
+var holidayEntries  = [];
 var loadedHolidayName = '';
+var highlightedHolidayDate = '';
+var holidayHighlightTimer = null;
 var markers = [{ id: 'marker-today', label: 'Today', date: '', color: '#58a6ff', isToday: true }];
 var DEFAULT_MARKERS = [{ id: 'marker-today', label: 'Today', date: '', color: '#58a6ff', isToday: true }];
 var activeDateChangeMode = null;
@@ -1775,8 +1845,17 @@ function drawWeekendShading(svg) {
     rect.setAttribute('y', String(hdrH));
     rect.setAttribute('width', String(dayWidth));
     rect.setAttribute('height', String(svgH - hdrH));
-    rect.setAttribute('class', isWeekend && isHoliday ? 'weekend-holiday-cell' : (isHoliday ? 'holiday-cell' : 'weekend-cell'));
-    rect.setAttribute('pointer-events','none');
+    var rectClass = isWeekend && isHoliday ? 'weekend-holiday-cell' : (isHoliday ? 'holiday-cell' : 'weekend-cell');
+    if(isHoliday && iso === highlightedHolidayDate) rectClass += ' holiday-focus';
+    rect.setAttribute('class', rectClass);
+    rect.setAttribute('pointer-events', isHoliday ? 'auto' : 'none');
+    if(isHoliday) {
+      rect.setAttribute('data-holiday-date', iso);
+      var title = document.createElementNS('http://www.w3.org/2000/svg','title');
+      var info = holidayInfoForDate(iso);
+      title.textContent = info.map(function(entry){ return entry.name || 'Holiday'; }).join(' | ') + ' (' + iso + ')';
+      rect.appendChild(title);
+    }
     shadeGroup.appendChild(rect);
   }
 
@@ -2171,6 +2250,12 @@ function doSaveJson(){
     version:2,
     savedAt:new Date().toISOString(),
     title:document.getElementById('appTitle').textContent,
+    settings:{
+      viewMode:currentView(),
+      colWidth:COL_WIDTH,
+      barHeight:BAR_HEIGHT,
+      theme:document.documentElement.classList.contains('light')?'light':'dark'
+    },
     phases:phases.map(serialisePhase),
     tasks:tasks.map(serialiseTask),
     markers:markers.map(serialiseMarker)
@@ -2326,6 +2411,7 @@ function applyExcludeHolidays(on) {
       btn.title = 'Load a holidays JSON file to enable holiday exclusion';
     }
   }
+  renderHolidayManager();
   renderGantt();
 }
 document.getElementById('btnWeekends').addEventListener('click', function(){
@@ -2351,8 +2437,18 @@ document.getElementById('holidayFileInput').addEventListener('change', function(
       var arr=Array.isArray(data)?data:(data.holidays||null);
       if(!Array.isArray(arr)){alert('Invalid holidays file: expected array or {holidays:[...]}'); return;}
       clearUndoHistory();
-      holidaySet = new Set(arr.map(function(h){return (h.date||h).slice(0,10);}));
+      holidayEntries = arr.map(function(h, index){
+        var rawDate = (h && typeof h === 'object') ? h.date : h;
+        var date = String(rawDate || '').slice(0,10);
+        return {
+          id: 'holiday-' + index + '-' + date,
+          date: date,
+          name: (h && typeof h === 'object' && h.name) ? String(h.name) : 'Holiday'
+        };
+      }).filter(function(entry){ return !!entry.date; }).sort(function(a, b){ return a.date.localeCompare(b.date); });
+      holidaySet = new Set(holidayEntries.map(function(entry){ return entry.date; }));
       loadedHolidayName = data.name || file.name;
+      highlightedHolidayDate = '';
       // If exclude-weekends is on, re-render so new holidays are factored into display dates
       applyExcludeHolidays(true);
     }catch(err){alert('Failed to load holidays: '+err.message);}

@@ -68,6 +68,28 @@ Example phase set:
 }
 ```
 
+## Saved Settings
+
+JSON exports include a `settings` object that restores the chart view on load:
+
+```json
+{
+  "settings": {
+    "viewMode": "Week",
+    "colWidth": 30,
+    "barHeight": 22,
+    "theme": "dark"
+  }
+}
+```
+
+- `viewMode`: `"Day"`, `"Week"`, or `"Month"`
+- `colWidth`: horizontal zoom level (18–120 px)
+- `barHeight`: vertical row height (12–60 px)
+- `theme`: `"light"` or `"dark"`
+
+Old JSON files without `settings` load normally using defaults.
+
 Rules:
 
 - `phase`: stores the phase `id` from the loaded phase set
