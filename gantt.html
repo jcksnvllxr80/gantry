@@ -1541,6 +1541,7 @@ function renderGantt() {
   // Build display copy with derived end dates so persisted task data only stores effort.
   var displayTasks = tasks.map(function(t) {
     var copy = deepClone(t);
+    copy.start = nextWorkday(copy.start);
     copy.end = taskEndDate(copy);
     return copy;
   });
@@ -2428,6 +2429,13 @@ function applyExcludeWeekends(on) {
 function applyExcludeHolidays(on) {
   pushUndo();
   excludeHolidays = on;
+  if(on) {
+    tasks.forEach(function(t){ t.start = nextWorkday(t.start); });
+    var m = taskMap(), rev = buildRevDeps();
+    tasks.filter(function(t){ return !getDeps(t).length; }).forEach(function(r){
+      cascadeEndDate(r.id, rev, m);
+    });
+  }
   var btn = document.getElementById('btnLoadHolidays');
   if(on) {
     btn.classList.add('active'); btn.style.borderColor='var(--accent)'; btn.style.color='var(--accent)';
