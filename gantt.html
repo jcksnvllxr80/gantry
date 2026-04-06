@@ -2453,8 +2453,20 @@ function applyExcludeHolidays(on) {
   if(on) {
     tasks.forEach(function(t){ t.start = nextWorkday(t.start); });
     var m = taskMap(), rev = buildRevDeps();
+    // Push dependents forward if they now overlap a parent's end date
+    function pushDeps(sid, vis) {
+      if(vis.has(sid)) return; vis.add(sid);
+      var src = m[sid]; if(!src) return;
+      var srcEnd = taskEndDate(src);
+      (rev[sid]||[]).forEach(function(did){
+        var dep = m[did]; if(!dep) return;
+        if(dep.start <= srcEnd) dep.start = shiftWorkdays(srcEnd, 1);
+        pushDeps(did, vis);
+      });
+    }
+    var vis = new Set();
     tasks.filter(function(t){ return !getDeps(t).length; }).forEach(function(r){
-      cascadeEndDate(r.id, rev, m);
+      pushDeps(r.id, vis);
     });
   }
   var btn = document.getElementById('btnLoadHolidays');
