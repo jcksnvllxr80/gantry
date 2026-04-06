@@ -224,6 +224,8 @@
     :root.light .weekend-shade rect.weekend-cell { fill: rgba(200,20,20,0.10) !important; }
     :root.light .weekend-shade rect.holiday-cell { fill: rgba(110,110,110,0.18) !important; }
     :root.light .weekend-shade rect.weekend-holiday-cell { fill: rgba(145,95,95,0.18) !important; }
+    .weekend-shade text.holiday-label { font-size: 10px; fill: rgba(180,120,120,0.55); pointer-events: none; dominant-baseline: hanging; }
+    :root.light .weekend-shade text.holiday-label { fill: rgba(140,80,80,0.5); }
     /* ── Vertical markers ──────────────────────────────────────── */
     .marker-lines line.marker-line  { stroke-width: 2; stroke-dasharray: 6 3; opacity: 0.85; }
     .marker-lines text.marker-label { font-size: 11px; font-weight: 600; pointer-events: none; }
@@ -1877,8 +1879,19 @@ function drawWeekendShading(svg) {
       rect.setAttribute('data-holiday-date', iso);
       var title = document.createElementNS('http://www.w3.org/2000/svg','title');
       var info = holidayInfoForDate(iso);
-      title.textContent = info.map(function(entry){ return entry.name || 'Holiday'; }).join(' | ') + ' (' + iso + ')';
+      var holidayLabel = info.map(function(entry){ return entry.name || 'Holiday'; }).join(' | ');
+      title.textContent = holidayLabel + ' (' + iso + ')';
       rect.appendChild(title);
+      // Visible rotated label for print / image export
+      var txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('class','holiday-label');
+      var tx = x + dayWidth / 2;
+      var ty = svgH - 6;
+      txt.setAttribute('x', '0');
+      txt.setAttribute('y', '0');
+      txt.setAttribute('transform', 'translate(' + tx + ',' + ty + ') rotate(-90)');
+      txt.textContent = holidayLabel;
+      shadeGroup.appendChild(txt);
     }
     shadeGroup.appendChild(rect);
   }
