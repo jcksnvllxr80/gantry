@@ -754,6 +754,20 @@ function cascade(sid,delta,rev,tMap,vis,skipSet,movedIds) {
     cascade(did,delta,rev,tMap,vis,skipSet,movedIds);
   });
 }
+function cascadeEndDate(sid,rev,tMap,vis,skipSet,movedIds) {
+  vis=vis||new Set(); if(vis.has(sid))return; vis.add(sid);
+  var src=tMap[sid]; if(!src)return;
+  var srcEnd=taskEndDate(src);
+  (rev[sid]||[]).forEach(function(did){
+    var dep=tMap[did]; if(!dep)return;
+    if(skipSet && skipSet.has(did)) { cascadeEndDate(did,rev,tMap,vis,skipSet,movedIds); return; }
+    if(dep.start<=srcEnd){
+      dep.start=excludeWeekends ? shiftWorkdays(srcEnd,1) : shiftDate(srcEnd,1);
+      if(movedIds) movedIds.add(did);
+    }
+    cascadeEndDate(did,rev,tMap,vis,skipSet,movedIds);
+  });
+}
 function serialiseTask(t) {
   return {
     id: t.id,
@@ -1577,7 +1591,9 @@ function renderGantt() {
         applySelectionEffortDelta(task.id, getTaskEffortDays(t) - oldEffort);
       }
       var startShift=excludeWeekends ? workdayDelta(oldStart, t.start) : daysBetween(oldStart, t.start);
-      if(startShift!==0)cascade(task.id,startShift,buildRevDeps(),tMap2,new Set(),targetIds.length>1?new Set(targetIds):null,movedIds);
+      var rev=buildRevDeps(), skip=targetIds.length>1?new Set(targetIds):null;
+      if(startShift!==0)cascade(task.id,startShift,rev,tMap2,new Set(),skip,movedIds);
+      if(!isMove)cascadeEndDate(task.id,rev,tMap2,null,skip,movedIds);
       queueIgnoredDateChanges(Array.from(movedIds));
       setTimeout(function(){
         activeDateChangeMode = null;
@@ -2055,7 +2071,9 @@ function showMultiDetail(id, chosen) {
     var nextEffort=clampEffortDays(e.target.value);
     var delta=nextEffort-getTaskEffortDays(primary);
     pushUndo();
+    var tMap2=taskMap(), rev=buildRevDeps(), skipSet=new Set(selectedIds), vis=new Set();
     chosen.forEach(function(task){ task.daysOfEffort=clampEffortDays(getTaskEffortDays(task)+delta); });
+    chosen.forEach(function(task){ cascadeEndDate(task.id,rev,tMap2,vis,skipSet); });
     renderGantt(); showDetail(id);
   });
   document.getElementById('btnClearSelection').addEventListener('click',function(){ clearSelectionUI(); renderGantt(); });
@@ -2164,7 +2182,8 @@ function showDetail(id) {
   });
   document.getElementById('fEffort').addEventListener('change',function(e){
     pushUndo();
-    taskMap()[id].daysOfEffort=clampEffortDays(e.target.value);
+    var m=taskMap(); m[id].daysOfEffort=clampEffortDays(e.target.value);
+    cascadeEndDate(id,buildRevDeps(),m);
     renderGantt(); showDetail(id);
   });
   // ── Delete dependency links ──
