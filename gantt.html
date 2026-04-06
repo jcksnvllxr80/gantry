@@ -1576,11 +1576,11 @@ function renderGantt() {
       } else if(!isMove && targetIds.length > 1) {
         applySelectionEffortDelta(task.id, getTaskEffortDays(t) - oldEffort);
       }
-      var startShift=excludeWeekends ? workdayDelta(oldStart, t.start) : daysBetween(oldStart, t.start);
-      var effortShift=getTaskEffortDays(t)-oldEffort;
+      var oldEndDate=excludeWeekends ? shiftWorkdays(oldStart, oldEffort-1) : shiftDate(oldStart, oldEffort-1);
+      var newEndDate=taskEndDate(t);
+      var endShift=excludeWeekends ? workdayDelta(oldEndDate, newEndDate) : daysBetween(oldEndDate, newEndDate);
       var rev=buildRevDeps(), skip=targetIds.length>1?new Set(targetIds):null;
-      var totalShift=isMove ? startShift : startShift+effortShift;
-      if(totalShift!==0)cascade(task.id,totalShift,rev,tMap2,new Set(),skip,movedIds);
+      if(endShift!==0)cascade(task.id,endShift,rev,tMap2,new Set(),skip,movedIds);
       queueIgnoredDateChanges(Array.from(movedIds));
       setTimeout(function(){
         activeDateChangeMode = null;
