@@ -254,12 +254,15 @@
     }
     .phase-labels { margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 5px; }
     .phase-pill {
-      display: inline-block; font-size: 11px; font-weight: 700;
+      display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700;
       text-transform: uppercase; letter-spacing: .06em;
       padding: 3px 9px; border-radius: 20px;
     }
+    .phase-pill .pill-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; display: inline-block; }
     .phase-pill.done { background: #eaeef2; color: #57606a; }
+    .phase-pill.done .pill-swatch { background: #8c959f; }
     .phase-pill.tbd  { background: #fff8c5; color: #7d4e00; }
+    .phase-pill.tbd  .pill-swatch { background: #bf8700; }
 
     .bar-wrapper.bar-done .bar { fill: #8c959f !important; }
     .bar-wrapper.bar-done .bar-label     { fill: #000 !important; }
@@ -852,13 +855,12 @@ function renderPhaseStyles() {
   document.getElementById('phaseStyles').textContent = css;
 }
 function phasePillHtml(phase) {
-  var rgb = hexToRgb(phase.color);
-  return '<span class="phase-pill" style="background:rgba('+rgb.r+','+rgb.g+','+rgb.b+',.18);color:'+phase.color+'">'+escHtml(phase.name)+'</span>';
+  return '<span class="phase-pill"><span class="pill-swatch" style="background:'+phase.color+'"></span>'+escHtml(phase.name)+'</span>';
 }
 function renderPhaseLabels() {
-  var html = '<span class="phase-pill done">&#10003; Complete</span>';
+  var html = '<span class="phase-pill done"><span class="pill-swatch"></span>&#10003; Complete</span>';
   if(phases.length) html += phases.map(phasePillHtml).join('');
-  html += '<span class="phase-pill tbd">Estimate TBD</span>';
+  html += '<span class="phase-pill tbd"><span class="pill-swatch"></span>Estimate TBD</span>';
   document.getElementById('phaseLabels').innerHTML = html;
 }
 function renderLegend() {
