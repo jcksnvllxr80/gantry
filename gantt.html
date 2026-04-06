@@ -266,6 +266,8 @@
     .bar-wrapper.bar-done .bar-label.big { fill: #333 !important; }
     .bar-wrapper.bar-tbd  .bar { fill: #bf8700 !important; }
     .bar-wrapper .bar-progress  { fill: rgba(255,255,255,.28) !important; }
+    .bar-wrapper .bar-date-label { font-size: 0.65em; fill: rgba(255,255,255,.7); dominant-baseline: auto; }
+    .bar-wrapper .bar-date-label.big { fill: rgba(200,200,200,.8); }
     .bar-wrapper:hover .handle.progress { fill: rgba(255,255,255,.85) !important; cursor: ew-resize; }
     #gantt svg, #reorderOverlay { user-select: none; }
     .today-highlight { fill: rgba(9,105,218,.06) !important; }
@@ -519,6 +521,7 @@
     <button class="btn btn-link" id="btnLinkMode" title="Click two tasks to create a dependency arrow">&#128279; Link</button>
     <button class="btn btn-green" id="btnAddTask">+ Add Task</button>
     <button class="btn" id="btnWeekends" title="Toggle: exclude weekends from workday counts">&#128197; Excl. Weekends</button>
+    <button class="btn" id="btnDateRange" title="Toggle: show date range on task bars">&#128198; Dates</button>
     <button class="btn" id="btnLoadHolidays" title="Load a holidays JSON file to enable holiday exclusion">&#127981; Load Holidays</button>
     <button class="btn" id="btnTheme" title="Toggle light / dark mode">&#9728; Light</button>
     <button class="btn" id="btnSave" title="Download current state as JSON">&#8595; Save JSON</button>
@@ -1190,6 +1193,7 @@ var activeSidebarTab = 'task';
 var linkMode        = false;
 var linkSource      = null;
 var excludeWeekends = false;
+var showDateRange   = false;
 var excludeHolidays = false;   // holiday shading/exclusion toggle
 var holidaySet      = new Set();
 var holidayEntries  = [];
@@ -1550,7 +1554,7 @@ function renderGantt() {
   displayTasks.forEach(function(t){ if(Array.isArray(t.dependencies)) t.dependencies=t.dependencies.filter(Boolean).join(','); });
   document.getElementById('gantt').innerHTML='';
   gantt=new Gantt('#gantt',displayTasks,{
-    header_height:50,column_width:COL_WIDTH,step:24,bar_height:BAR_HEIGHT,bar_corner_radius:4,
+    header_height:50,column_width:COL_WIDTH,step:24,bar_height:showDateRange?BAR_HEIGHT*2:BAR_HEIGHT,bar_corner_radius:4,
     arrow_curve:5,padding:18,view_mode:currentView(),date_format:'YYYY-MM-DD',language:'en',
     popup_trigger:'mouseenter',        // tooltip on hover; click is ours
     custom_popup_html:null,
@@ -1824,6 +1828,8 @@ function renderGantt() {
 
     }, true); // ← capture phase: fires before frappe's bubble-phase delegate listener
 
+    // ── Date range labels ──────────────────────────────────────
+    if(showDateRange) injectDateRangeLabels(svg);
     // ── Weekend shading ────────────────────────────────────────
     drawWeekendShading(svg);
     drawMarkers(svg);
@@ -2471,6 +2477,53 @@ document.getElementById('btnWeekends').addEventListener('click', function(){
   applyExcludeWeekends(!excludeWeekends);
 });
 
+function applyShowDateRange(on) {
+  showDateRange = on;
+  var btn = document.getElementById('btnDateRange');
+  if(on) { btn.classList.add('active'); btn.style.borderColor='var(--accent)'; btn.style.color='var(--accent)'; }
+  else   { btn.classList.remove('active'); btn.style.borderColor=''; btn.style.color=''; }
+  try{ localStorage.setItem('gantry-show-dates', on?'1':'0'); }catch(e){}
+  renderGantt();
+  if(selectedId) showDetail(selectedId);
+}
+function fmtShort(s){ return parseLocal(s).toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+function injectDateRangeLabels(svg) {
+  var tMap2 = taskMap();
+  svg.querySelectorAll('.bar-wrapper').forEach(function(wrapper){
+    var id = wrapper.getAttribute('data-id');
+    var t = tMap2[id]; if(!t) return;
+    var nameLabel = wrapper.querySelector('.bar-label');
+    if(!nameLabel) return;
+    var endD = taskEndDate(t);
+    var rangeText = fmtShort(t.start) + ' \u2013 ' + fmtShort(endD);
+    var bar = wrapper.querySelector('.bar');
+    var barX = parseFloat(bar.getAttribute('x'));
+    var barW = parseFloat(bar.getAttribute('width'));
+    var barY = parseFloat(bar.getAttribute('y'));
+    var barH = parseFloat(bar.getAttribute('height'));
+    // Shift name label up, place date label below
+    nameLabel.setAttribute('y', barY + barH * 0.35);
+    var dateLbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    dateLbl.setAttribute('x', barX + barW / 2);
+    dateLbl.setAttribute('y', barY + barH * 0.72);
+    dateLbl.setAttribute('class','bar-date-label');
+    dateLbl.setAttribute('text-anchor','middle');
+    dateLbl.textContent = rangeText;
+    wrapper.appendChild(dateLbl);
+    // If label overflows bar, position outside like frappe does for .big
+    requestAnimationFrame(function(){
+      if(dateLbl.getBBox().width > barW) {
+        dateLbl.classList.add('big');
+        dateLbl.setAttribute('x', barX + barW + 5);
+        dateLbl.setAttribute('text-anchor','start');
+      }
+    });
+  });
+}
+document.getElementById('btnDateRange').addEventListener('click', function(){
+  applyShowDateRange(!showDateRange);
+});
+
 // Holiday button: if holidays loaded → toggle on/off; if none loaded → open file picker
 function doLoadHolidays(){
   if(holidaySet.size > 0) {
@@ -2647,6 +2700,7 @@ document.getElementById('zoomColOut').addEventListener('click', function(){
 // ─────────────────────────────────────────────────────────────────
 try{ applyTheme(localStorage.getItem('gantry-theme')==='light'); }catch(e){ applyTheme(false); }
 try{ if(localStorage.getItem('gantry-excl-weekends')==='1') applyExcludeWeekends(true); }catch(e){}
+try{ if(localStorage.getItem('gantry-show-dates')==='1') applyShowDateRange(true); }catch(e){}
 setSidebarTab(activeSidebarTab);
 syncPhaseUI(false);
 renderGantt();
