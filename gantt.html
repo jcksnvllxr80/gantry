@@ -486,6 +486,7 @@
       <div class="menu-sep"></div>
       <button class="menu-action" data-action="exportPng">Export PNG</button>
       <button class="menu-action" data-action="exportPdf">Export PDF</button>
+      <button class="menu-action" data-action="exportCsv">Export CSV</button>
       <div class="menu-sep"></div>
       <button class="menu-action" data-action="reset">Reset</button>
     </div>
@@ -531,6 +532,7 @@
     <button class="btn" id="btnLoad" title="Load a saved JSON file">&#8593; Load JSON</button>
     <button class="btn" id="btnExportPng" title="Export chart as PNG image">&#128247; PNG</button>
     <button class="btn" id="btnExportPdf" title="Export chart as PDF">&#128196; PDF</button>
+    <button class="btn" id="btnExportCsv" title="Export tasks to CSV file">CSV</button>
     <button class="btn" id="btnReset">&#8635; Reset</button>
   </div>
 </header>
@@ -2315,6 +2317,31 @@ function doSaveJson(){
     })
   });
 }
+function doExportCsv(){
+  if(!tasks.length){ alert('No tasks to export.'); return; }
+  function quote(value){
+    if(value == null) return '';
+    var str = String(value);
+    if(/[",\n]/.test(str)) return '"' + str.replace(/"/g,'""') + '"';
+    return str;
+  }
+  var rows = ['Task,Start,End'];
+  tasks.forEach(function(task){
+    rows.push([
+      quote(task.name),
+      quote(task.start),
+      quote(taskEndDate(task))
+    ].join(','));
+  });
+  var csv = rows.join('\n');
+  var slug=(document.getElementById('appTitle').textContent||'gantry').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement('a');
+  link.href = url; link.download = slug + '-tasks-' + toISO(new Date()) + '.csv';
+  document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
+  showToast('CSV saved!');
+}
 function doLoadJson(){ document.getElementById('fileInput').value=''; document.getElementById('fileInput').click(); }
 document.getElementById('fileInput').addEventListener('change',function(e){
   var file=e.target.files[0]; if(!file)return;
@@ -2656,7 +2683,7 @@ var menuActions = {
   save: doSaveJson, load: doLoadJson,
   savePhases: doSavePhases, loadPhases: doLoadPhases,
   loadHolidays: doLoadHolidays,
-  exportPng: doExportPng, exportPdf: doExportPdf,
+  exportPng: doExportPng, exportPdf: doExportPdf, exportCsv: doExportCsv,
   reset: doReset,
   undo: undo, redo: redo,
   copy: function(){ copySelectionToClipboard(); },
@@ -2687,6 +2714,7 @@ document.getElementById('btnSave').addEventListener('click', doSaveJson);
 document.getElementById('btnLoad').addEventListener('click', doLoadJson);
 document.getElementById('btnExportPng').addEventListener('click', doExportPng);
 document.getElementById('btnExportPdf').addEventListener('click', doExportPdf);
+document.getElementById('btnExportCsv').addEventListener('click', doExportCsv);
 document.getElementById('btnReset').addEventListener('click', doReset);
 document.getElementById('btnSavePhases').addEventListener('click', doSavePhases);
 document.getElementById('btnLoadPhases').addEventListener('click', doLoadPhases);

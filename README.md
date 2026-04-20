@@ -17,7 +17,7 @@ PNG, or PDF.
 3. Click `Add Task`.
 4. Enter task name, start date, days of effort, assignee, phase, and note.
 5. Use `Link` to connect dependencies.
-6. Use `Save JSON` to export the current state.
+6. Use `Save JSON` or `CSV` to export task dates and names.
 
 ## Edit An Existing Chart
 
@@ -137,6 +137,7 @@ Older data with `start` and `end` still loads, but the app saves tasks back as `
 - Timeline markers (labeled vertical lines for "Today", goals, milestones)
 - Light and dark theme toggle
 - JSON import and export
+- CSV export of task name, start, and end dates
 - PNG and PDF export
 - Reset back to the loaded config
 
